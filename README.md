@@ -49,7 +49,7 @@ screen. Wayland support is on the roadmap — see [Known limitations](#known-lim
 curl -fsSL https://sskazal.github.io/meeting-recorder/KEY.gpg \
   | sudo gpg --dearmor -o /usr/share/keyrings/meeting-recorder.gpg
 
-echo "deb [signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://sskazal.github.io/meeting-recorder stable main" \
+echo "deb [arch=all signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://sskazal.github.io/meeting-recorder stable main" \
   | sudo tee /etc/apt/sources.list.d/meeting-recorder.list
 
 sudo apt update && sudo apt install meeting-recorder

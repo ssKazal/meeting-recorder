@@ -94,13 +94,18 @@ curl -fsSL https://sskazal.github.io/meeting-recorder/KEY.gpg \
   | sudo gpg --dearmor -o /usr/share/keyrings/meeting-recorder.gpg
 
 # 2. Add the repository
-echo "deb [signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://sskazal.github.io/meeting-recorder stable main" \
+echo "deb [arch=all signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://sskazal.github.io/meeting-recorder stable main" \
   | sudo tee /etc/apt/sources.list.d/meeting-recorder.list
 
 # 3. Install
 sudo apt update
 sudo apt install meeting-recorder
 ```
+
+> **Why `arch=all`?** The package is `Architecture: all` (pure Python, works on any
+> CPU), so the repository only publishes a `binary-all` index. Without `arch=all`,
+> apt also looks for `binary-amd64`/`binary-i386` and prints harmless
+> "doesn't support architecture" notes. The package installs either way.
 
 Uninstall:
 

@@ -132,7 +132,7 @@ jobs:
             echo
             echo '```bash'
             echo "curl -fsSL ${PAGES_URL}/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/meeting-recorder.gpg"
-            echo "echo \"deb [signed-by=/usr/share/keyrings/meeting-recorder.gpg] ${PAGES_URL} stable main\" | sudo tee /etc/apt/sources.list.d/meeting-recorder.list"
+            echo "echo \"deb [arch=all signed-by=/usr/share/keyrings/meeting-recorder.gpg] ${PAGES_URL} stable main\" | sudo tee /etc/apt/sources.list.d/meeting-recorder.list"
             echo "sudo apt update && sudo apt install meeting-recorder"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
