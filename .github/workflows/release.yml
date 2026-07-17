@@ -1,0 +1,72 @@
+name: Release
+
+# Publishing is driven by pushing a version tag, e.g.:
+#   git tag -a v0.1.2 -m "v0.1.2" && git push --follow-tags
+#
+# Protect the `v*` tag pattern in Settings -> Tags so only maintainers can
+# trigger a release.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to create the release and upload the .deb
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the source version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          SRC="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' meeting_recorder/__init__.py)"
+          echo "tag=$TAG source=$SRC"
+          if [ "$TAG" != "$SRC" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match __version__ ($SRC)."
+            echo "Bump meeting_recorder/__init__.py (and pyproject.toml) before tagging."
+            exit 1
+          fi
+
+      - name: Run tests
+        run: python3 tests/run_tests.py
+
+      - name: Build .deb
+        env:
+          MAINTAINER: ${{ vars.DEB_MAINTAINER }}
+          HOMEPAGE: https://github.com/${{ github.repository }}
+        run: ./packaging/build-deb.sh
+
+      - name: Verify the package installs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ./dist/*.deb
+          meeting-recorder --version
+
+      - name: Assemble release notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # This version's section from CHANGELOG.md ...
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" {f=1; next}
+            f && /^## \[/ {exit}
+            f {print}
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "Release $GITHUB_REF_NAME" > notes.md
+          fi
+          # ... plus the standard install/requirements footer.
+          sed "s/__VERSION__/${VERSION}/g" .github/release-footer.md >> notes.md
+          echo "----- notes -----"; cat notes.md
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb
+          body_path: notes.md
+          name: Smart Meeting Recorder ${{ github.ref_name }}
+          draft: false
+          prerelease: false

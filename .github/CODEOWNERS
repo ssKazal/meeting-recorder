@@ -1,0 +1,4 @@
+# Every change requires review from a maintainer.
+# Combine with branch protection: Settings -> Rules/Branches -> require a pull
+# request, require approvals, and "Require review from Code Owners".
+*       @ssKazal

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app deliberately has no pip dependencies and the test runner is
+      # stdlib-only, so there is nothing to install for the unit tests.
+      - name: Run tests
+        run: python3 tests/run_tests.py
+
+      - name: Byte-compile all modules
+        run: python3 -m compileall -q meeting_recorder
+
+  package:
+    name: Build .deb
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build package
+        env:
+          HOMEPAGE: https://github.com/${{ github.repository }}
+        run: ./packaging/build-deb.sh
+
+      - name: Verify the package installs and runs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ./dist/*.deb
+          meeting-recorder --version
+          # Config must resolve from the installed location, not the source tree.
+          cd /tmp && meeting-recorder config
+
+      - name: Lint the package
+        run: |
+          sudo apt-get install -y lintian
+          # Informational: don't fail the build on packaging nitpicks.
+          lintian --no-tag-display-limit dist/*.deb || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meeting-recorder-deb
+          path: dist/*.deb

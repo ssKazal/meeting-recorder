@@ -1,0 +1,82 @@
+name: Bug report
+description: Something doesn't work
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! Most issues are answered by the fields below, so
+        please fill them in — especially the **session type**.
+
+  - type: dropdown
+    id: session
+    attributes:
+      label: Session type
+      description: "Output of: `echo $XDG_SESSION_TYPE`"
+      options:
+        - x11
+        - wayland
+        - "I don't know"
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        > ⚠️ **If you selected `wayland`:** screen capture is not supported yet —
+        > this release uses `x11grab`. Log out and choose **"Ubuntu on Xorg"** at
+        > the login screen. Please don't open a new issue for this; comment on the
+        > Wayland support issue instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "Output of: `meeting-recorder --version`"
+      placeholder: "meeting-recorder 0.1.1"
+    validations:
+      required: true
+
+  - type: input
+    id: distro
+    attributes:
+      label: Distribution and desktop
+      placeholder: "Ubuntu 24.04, GNOME 46"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Join a Google Meet call
+        2. Click Record on the popup
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `meeting-recorder status`
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Service log
+      description: "`journalctl --user -u meeting-recorder -n 50 --no-pager`"
+      render: shell
+    validations:
+      required: false
