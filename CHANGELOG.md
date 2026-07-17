@@ -4,6 +4,22 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] — 2026-07-17
+
+### Added
+- `meeting-recorder start`, `stop`, `restart` and `logs` — wrappers around
+  `systemctl --user` / `journalctl --user`, so the `--user` flag is never needed
+  for day-to-day use.
+
+### Changed
+- `meeting-recorder status` now reports the background service state (active,
+  inactive, failed, or not-installed) alongside the active capture streams and
+  the meeting match.
+- README and man page explain why this must be a *user* service rather than a
+  system one: it needs the caller's X display for screen capture, PulseAudio
+  session for audio, and D-Bus session for notifications and the tray icon —
+  the same reason `pipewire` is a user service.
+
 ## [0.1.0] — 2026-07-17
 
 First release.
@@ -46,4 +62,5 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.1.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.0

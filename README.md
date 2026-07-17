@@ -5,7 +5,7 @@ system audio. Stops automatically when the call ends.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20X11-blue)
-![Version](https://img.shields.io/badge/version-0.1.0-green)
+![Version](https://img.shields.io/badge/version-0.1.1-green)
 
 No more remembering to hit record. The app sits in the background, notices when a call starts, and
 asks:
@@ -47,7 +47,7 @@ Download the `.deb` from [Releases](../../releases) and install it — `apt` pul
 rest automatically:
 
 ```bash
-sudo apt install ./meeting-recorder_0.1.0_all.deb
+sudo apt install ./meeting-recorder_0.1.1_all.deb
 ```
 
 The background service is enabled for you and starts at your next login. To start it right away:
