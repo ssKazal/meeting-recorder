@@ -4,6 +4,19 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] — 2026-07-17
+
+### Fixed
+- `meeting-recorder record` now produces a file. It treated the boolean from
+  `stop()` as the saved path and exited immediately, so the background finalize
+  pass (concat + denoise + normalize) was killed by the same Ctrl-C that stopped
+  capture — leaving orphaned segment files and no output. It now waits for
+  finalize to finish and reports the real saved path.
+
+### Internal
+- CI builds the `debian/` source package (adds `build-essential`), keeping the
+  Launchpad packaging path from drifting from `packaging/build-deb.sh`.
+
 ## [0.1.1] — 2026-07-17
 
 ### Added
@@ -62,5 +75,6 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.1.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.0

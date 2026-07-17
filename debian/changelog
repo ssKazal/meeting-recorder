@@ -1,3 +1,12 @@
+meeting-recorder (0.1.2) noble; urgency=medium
+
+  * Fix `meeting-recorder record` never producing a final file: the manual
+    record command now waits for the background finalize pass (concat +
+    denoise + loudness normalize) instead of exiting immediately, which had
+    left orphaned .partN segments and no output .mkv.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Fri, 17 Jul 2026 21:40:00 +0600
+
 meeting-recorder (0.1.1) noble; urgency=medium
 
   * Add meeting-recorder start/stop/restart/logs wrappers around
