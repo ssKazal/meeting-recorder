@@ -35,20 +35,39 @@ jobs:
         id: tag
         run: echo "tag=${{ github.event.release.tag_name || inputs.tag }}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      # Tooling (this workflow's scripts) comes from the ref the workflow runs
+      # from, while the package itself is built from the tag's source. Tags made
+      # before a script existed would otherwise fail to build.
+      - name: Check out tooling
+        uses: actions/checkout@v4
+
+      - name: Check out the tag's source
+        uses: actions/checkout@v4
         with:
           ref: ${{ steps.tag.outputs.tag }}
+          path: src
 
       - name: Install packaging tools
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev apt-utils gnupg
 
-      - name: Build .deb
+      - name: Build .deb from the tag
         env:
           MAINTAINER: ${{ vars.DEB_MAINTAINER }}
           HOMEPAGE: https://github.com/${{ github.repository }}
+        working-directory: src
         run: ./packaging/build-deb.sh
+
+      - name: Check the built version matches the tag
+        run: |
+          WANT="${{ steps.tag.outputs.tag }}"; WANT="${WANT#v}"
+          if [ ! -f "src/dist/meeting-recorder_${WANT}_all.deb" ]; then
+            echo "::error::Expected src/dist/meeting-recorder_${WANT}_all.deb; got:"
+            ls -1 src/dist/ || true
+            exit 1
+          fi
+          echo "Built meeting-recorder_${WANT}_all.deb"
 
       - name: Import signing key
         id: gpg
@@ -78,7 +97,7 @@ jobs:
         env:
           GPG_KEY_ID: ${{ steps.gpg.outputs.key_id }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: ./packaging/build-apt-repo.sh aptrepo dist/*.deb
+        run: ./packaging/build-apt-repo.sh aptrepo src/dist/*.deb
 
       - name: Add a landing page
         env:
