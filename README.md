@@ -57,14 +57,7 @@ sudo apt update && sudo apt install meeting-recorder
 
 Updates then arrive with `apt upgrade` like any other package.
 
-### Option 2 — Ubuntu PPA
-
-```bash
-sudo add-apt-repository ppa:sskazal/meeting-recorder
-sudo apt update && sudo apt install meeting-recorder
-```
-
-### Option 3 — download the `.deb`
+### Option 2 — download the `.deb`
 
 Grab it from [Releases](../../releases) — `apt` pulls in ffmpeg and the rest automatically:
 

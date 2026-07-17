@@ -51,8 +51,11 @@ jobs:
           name: meeting-recorder-deb
           path: dist/*.deb
 
+  # The debian/ directory exists so a Launchpad PPA *can* be published later; no
+  # PPA is published today (see docs/PPA.md). Building it here keeps it from
+  # bit-rotting and stops it drifting from packaging/build-deb.sh.
   source-package:
-    name: Build source package (PPA)
+    name: Build source package (debian/)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,9 +65,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y debhelper devscripts dpkg-dev lintian
 
-      # Launchpad builds from a *source* package, so the debian/ directory has to
-      # work on its own. Verify both the binary and source builds here, since
-      # they're what a PPA upload depends on.
+      # Launchpad would build from a *source* package, so debian/ has to work on
+      # its own. Verify both the binary and source builds.
       - name: Build binary package from debian/
         run: dpkg-buildpackage -us -uc -b
 

@@ -1,5 +1,20 @@
 # Launchpad PPA
 
+> ## ⚠️ Not published yet
+>
+> **There is no `ppa:sskazal/meeting-recorder` today — don't advertise one.** The
+> packaging in [`debian/`](../debian) is finished and CI builds it on every push,
+> so this is ready to go whenever we want it; nothing here is done yet though.
+>
+> Use the [GitHub Pages APT repository](APT-REPO.md) instead: it gives users the
+> same `sudo apt install meeting-recorder` with auto-updates, needs no Launchpad
+> account, and publishes automatically on release.
+>
+> A PPA only adds the familiar `add-apt-repository ppa:...` one-liner. Worth doing
+> eventually; not worth blocking on.
+
+---
+
 A PPA gives Ubuntu users the most native install path:
 
 ```bash
