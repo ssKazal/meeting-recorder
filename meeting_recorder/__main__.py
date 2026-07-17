@@ -84,9 +84,17 @@ def _cmd_record(cfg) -> int:
         signal.pause()
     except KeyboardInterrupt:
         pass
-    saved = recorder.stop()
-    print(f"Saved: {saved}" if saved else "No file saved.")
-    return 0
+    # stop() only *launches* finalize (concat + denoise + loudnorm) in the
+    # background and returns a bool; we must block until it finishes, otherwise
+    # the process exits and the finalize child is killed, leaving orphaned
+    # .partN segments and no final file.
+    if not recorder.stop():
+        print("No file saved.")
+        return 1
+    print("Finalizing (denoise + loudness normalize)…")
+    saved = recorder.wait_finalize()
+    print(f"Saved: {saved}" if saved else "Finalize failed — no file saved.")
+    return 0 if saved else 1
 
 
 # -- service control (wraps `systemctl --user` so callers don't have to) ----
