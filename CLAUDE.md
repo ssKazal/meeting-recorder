@@ -2,6 +2,24 @@
 
 Context primer for AI assistants. Read this first; open source files only as needed.
 
+## Don't
+
+- **Never `git push`.** The maintainer pushes manually, after reviewing the diff. Never push to
+  `main`, never push tags, never `--force`. This applies even when a task seems to imply it
+  ("release it", "ship it") — prepare the work and stop.
+- **Never commit without asking first.** Show what changed (`git status` / `git diff`) and wait for
+  an explicit go-ahead so the maintainer can review it. Staging is fine; committing is not.
+- **Never add a `Co-Authored-By: Claude ...` trailer** (or any similar attribution line) to commit
+  messages. Write the message as the maintainer would; no tool attribution.
+- **Never create GitHub releases, or publish to the APT repo / any distribution channel.**
+- **Don't run `sudo`** — hand the maintainer the exact command instead.
+- **Don't delete recordings, `~/.config/meeting-recorder/`, or anything under
+  `~/Videos/MeetingRecorder/`** without explicit permission. Build artifacts and `/tmp` scratch are
+  fine to clean.
+
+The working loop is: make the change → verify it → **report and wait**. The maintainer reviews,
+commits and pushes.
+
 ## Idea
 Lightweight Linux background daemon that auto-detects online meetings/calls (Zoom, Meet,
 Teams, Discord, Slack, browsers), shows a **permission popup**, and on one click records
