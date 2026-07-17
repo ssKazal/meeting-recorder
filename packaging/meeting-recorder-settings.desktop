@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Meeting Recorder Settings
+GenericName=Meeting Recorder
+Comment=Configure automatic meeting recording
+Exec=meeting-recorder settings
+Icon=meeting-recorder
+Terminal=false
+Categories=AudioVideo;Recorder;
+Keywords=meeting;record;screen;zoom;teams;meet;
+StartupNotify=true

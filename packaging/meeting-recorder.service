@@ -1,0 +1,18 @@
+[Unit]
+Description=Smart Meeting Recorder (auto-detect meetings and offer to record)
+Documentation=man:meeting-recorder(1)
+After=graphical-session.target pipewire.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/meeting-recorder run
+Environment=PYTHONUNBUFFERED=1
+# Fallback X11 display for screen capture and notifications; the graphical
+# session normally imports the real DISPLAY/XAUTHORITY into the user manager.
+Environment=DISPLAY=:0
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

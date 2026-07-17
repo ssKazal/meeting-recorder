@@ -1,0 +1,36 @@
+Package: meeting-recorder
+Version: VERSION_PLACEHOLDER
+Section: video
+Priority: optional
+Architecture: all
+Maintainer: MAINTAINER_PLACEHOLDER
+Depends: python3 (>= 3.10),
+         python3-gi,
+         gir1.2-gtk-3.0,
+         gir1.2-notify-0.7,
+         gir1.2-appindicator3-0.1,
+         ffmpeg,
+         pulseaudio-utils,
+         x11-utils,
+         x11-xserver-utils
+Recommends: gnome-shell-extension-appindicator
+Suggests: slop
+Homepage: HOMEPAGE_PLACEHOLDER
+Description: Automatic meeting recorder for Linux desktops
+ Smart Meeting Recorder runs quietly in the background and notices when you join
+ an online meeting or voice call - Zoom, Google Meet, Microsoft Teams, Discord,
+ Slack, Webex or a browser call - by watching which application is using your
+ microphone.
+ .
+ Instead of recording automatically it asks first: "Meeting detected. Start
+ recording?". One click records your screen, microphone and (optionally) system
+ audio; recording stops by itself when the call ends and the file is saved as
+ <App>_<timestamp>.mkv.
+ .
+ A tray icon gives a live timer plus pause, resume and stop. Pausing excludes the
+ paused time from the saved file. Your microphone and the caller are each
+ loudness-normalised so both voices come out at a comparable level, and
+ background noise is filtered from the mic.
+ .
+ Note: this release captures the screen via X11 (x11grab) and does not yet
+ support Wayland sessions.

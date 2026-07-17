@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Screen -->
+  <rect x="4" y="8" width="40" height="28" rx="3" fill="none" stroke="#3d3d3d"
+        stroke-width="3"/>
+  <path d="M16 40h16" stroke="#3d3d3d" stroke-width="3" stroke-linecap="round"/>
+  <path d="M24 36v4" stroke="#3d3d3d" stroke-width="3"/>
+  <!-- Record dot -->
+  <circle cx="24" cy="22" r="7" fill="#e01b24"/>
+</svg>

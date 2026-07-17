@@ -1,0 +1,29 @@
+Source Output #42
+	Driver: PipeWire
+	Owner Module: n/a
+	Client: 88
+	Source: 46
+	Sample Specification: float32le 1ch 48000Hz
+	Channel Map: mono
+	Format: pcm, format.sample_format = "\"float32le\""
+	Corked: no
+	Mute: no
+	Volume: mono: 65536 / 100%
+	Properties:
+		media.name = "Recording"
+		application.name = "Firefox"
+		application.process.id = "12345"
+		application.process.binary = "firefox"
+		node.name = "firefox"
+		device.name = "alsa_input.usb-Logitech_Logi_USB_Headset_000000000000-00.mono-fallback"
+
+Source Output #7
+	Driver: PipeWire
+	Client: 90
+	Source: 51
+	Properties:
+		media.name = "loopback"
+		application.name = "PulseAudio Volume Control"
+		application.process.binary = "pavucontrol"
+		node.name = "alsa_output.pci-0000_00_1f.3.analog-stereo.monitor"
+		device.name = "alsa_output.pci-0000_00_1f.3.analog-stereo.monitor"

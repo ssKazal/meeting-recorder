@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meeting-recorder"
+version = "0.1.0"
+description = "Detects online meetings on Linux and offers to record screen, mic and system audio."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+keywords = ["meeting", "recorder", "screen-recording", "linux", "zoom", "teams"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: GTK",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Video :: Capture",
+]
+# Runtime needs are system packages, not wheels: ffmpeg, pulseaudio-utils,
+# python3-gi, gir1.2-gtk-3.0, gir1.2-notify-0.7, gir1.2-appindicator3-0.1,
+# x11-utils, x11-xserver-utils. See README / the .deb for the full list.
+dependencies = []
+
+[project.scripts]
+meeting-recorder = "meeting_recorder.__main__:main"
+
+[tool.setuptools]
+packages = ["meeting_recorder"]
+
+[tool.setuptools.package-data]
+meeting_recorder = ["default_config.json"]

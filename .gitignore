@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Packaging staging output
+/build/deb/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Recordings and local scratch
+*.mkv
+*.mp4
+
+# Local planning notes (not part of the release)
+i-want-smart-meeting-*.md
