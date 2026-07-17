@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Meeting Recorder — APT repository</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 46rem; margin: 3rem auto; padding: 0 1.25rem; line-height: 1.6; }
+  h1 { margin-bottom: .25rem; }
+  .sub { opacity: .75; margin-top: 0; }
+  pre { background: #1c1c1e; color: #f2f2f7; padding: 1rem; border-radius: 8px;
+        overflow-x: auto; font-size: .9rem; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .warn { border-left: 4px solid #e01b24; padding: .5rem 1rem; background: rgba(224,27,36,.08);
+          border-radius: 4px; }
+  a { color: #0a84ff; }
+  footer { margin-top: 3rem; font-size: .85rem; opacity: .7; }
+</style>
+</head>
+<body>
+<h1>Smart Meeting Recorder</h1>
+<p class="sub">APT repository for Debian / Ubuntu</p>
+
+<p>Detects when you join an online meeting and asks before recording your screen,
+microphone and system audio. Stops automatically when the call ends.</p>
+
+<h2>Install</h2>
+<pre><code>curl -fsSL https://ssKazal.github.io/meeting-recorder/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/meeting-recorder.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://ssKazal.github.io/meeting-recorder stable main" \
+  | sudo tee /etc/apt/sources.list.d/meeting-recorder.list
+
+sudo apt update
+sudo apt install meeting-recorder</code></pre>
+
+<p>Updates then arrive through <code>apt upgrade</code> like any other package.</p>
+
+<h2>Use</h2>
+<pre><code>meeting-recorder start      # start the background service
+meeting-recorder status     # service state + detected meeting
+meeting-recorder settings   # settings window</code></pre>
+
+<p class="warn"><strong>⚠️ X11 only.</strong> Screen capture uses <code>x11grab</code>;
+Wayland is not supported yet. Check with <code>echo $XDG_SESSION_TYPE</code> — it must
+print <code>x11</code>. If it prints <code>wayland</code>, log out and pick
+<strong>“Ubuntu on Xorg”</strong> at the login screen.</p>
+
+<h2>Uninstall</h2>
+<pre><code>sudo apt remove meeting-recorder
+sudo rm /etc/apt/sources.list.d/meeting-recorder.list /usr/share/keyrings/meeting-recorder.gpg</code></pre>
+
+<footer>
+  <a href="https://github.com/ssKazal/meeting-recorder">Source &amp; documentation on GitHub</a>
+  · MIT licensed
+</footer>
+</body>
+</html>
