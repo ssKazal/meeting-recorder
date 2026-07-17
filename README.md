@@ -107,21 +107,30 @@ capture area and behavior. **Save & Apply** restarts the service so changes take
 ### Command line
 
 ```bash
-meeting-recorder run        # run the detector in the foreground
+meeting-recorder status     # service state + capture streams + meeting match
+meeting-recorder start      # start the background service
+meeting-recorder stop       # stop it (pause detection)
+meeting-recorder restart    # restart it (apply setting changes)
+meeting-recorder logs       # follow the service log
 meeting-recorder settings   # settings window
-meeting-recorder status     # show current capture streams + meeting match
+meeting-recorder run        # run the detector in the foreground
 meeting-recorder record     # record right now until Ctrl-C
-meeting-recorder config     # print the config file path
+meeting-recorder config     # create/print the config file
 ```
 
-### Service control
+`start`/`stop`/`restart`/`logs` wrap `systemctl --user`, so you never need to
+remember the `--user` flag. The equivalents are:
 
 ```bash
-systemctl --user status meeting-recorder
-systemctl --user restart meeting-recorder
-journalctl --user -u meeting-recorder -f      # live logs
-systemctl --user stop meeting-recorder        # pause detection
+systemctl --user status|start|stop|restart meeting-recorder
+journalctl --user -u meeting-recorder -f
 ```
+
+> **Why `--user`?** This is a *user* service, not a system one: it needs your X
+> display (screen capture), your PulseAudio session (mic/system audio) and your
+> D-Bus session (notifications, tray icon). A system service runs as root with
+> none of those, so it must run in your session — hence `--user`, or just use the
+> wrapper commands above.
 
 ## Configuration
 

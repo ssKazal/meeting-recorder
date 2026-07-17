@@ -23,16 +23,28 @@ This release captures the screen through X11
 and does not support Wayland sessions.
 .SH COMMANDS
 .TP
-.B run
-Start the detector daemon in the foreground. This is what the systemd user
-service runs. Default when no command is given.
+.B status
+Print the background service state, the currently active audio capture streams,
+and whether any matches a known meeting application.
+.TP
+.B start
+Start the background service.
+.TP
+.B stop
+Stop the background service, suspending meeting detection.
+.TP
+.B restart
+Restart the background service, applying configuration changes.
+.TP
+.B logs
+Follow the service log.
 .TP
 .B settings
 Open the graphical settings window.
 .TP
-.B status
-Print the currently active audio capture streams and whether any matches a
-known meeting application.
+.B run
+Start the detector daemon in the foreground. This is what the systemd user
+service runs. Default when no command is given.
 .TP
 .B record
 Start recording immediately and continue until interrupted with Ctrl\-C.
@@ -85,7 +97,15 @@ Rules of the form
 .RI { \(dqmatch\(dq : \(dqzoom\(dq , \(dqapp\(dq : \(dqZoom\(dq }
 matched against the application using the microphone.
 .SH SERVICE
-The background service is a systemd user unit:
+The background service is a systemd
+.I user
+unit, not a system unit: it needs the caller's X display for screen capture,
+PulseAudio session for audio, and D-Bus session for notifications and the tray
+icon. The
+.BR start ", " stop ", " restart " and " logs
+commands wrap the equivalent
+.B systemctl \-\-user
+calls:
 .PP
 .nf
 .RS

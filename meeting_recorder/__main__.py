@@ -1,21 +1,32 @@
 """CLI entry point.
 
-  python -m meeting_recorder run       # start the detection daemon (default)
-  python -m meeting_recorder record    # manual one-off recording (Ctrl-C to stop)
-  python -m meeting_recorder status    # print detected capture streams once
-  python -m meeting_recorder settings  # open the GTK settings window
-  python -m meeting_recorder config    # write a user config file to edit
+  meeting-recorder status     # service state + detected capture streams
+  meeting-recorder start      # start the background service
+  meeting-recorder stop       # stop it
+  meeting-recorder restart    # restart it (after changing settings)
+  meeting-recorder logs       # follow the service log
+  meeting-recorder settings   # open the GTK settings window
+  meeting-recorder run        # run the detector in the foreground (the service runs this)
+  meeting-recorder record     # manual one-off recording (Ctrl-C to stop)
+  meeting-recorder config     # create/print the user config file
+
+The start/stop/restart/logs commands wrap `systemctl --user` so users never need
+to remember that this is a *user* unit (it must be: it needs the caller's X
+display, PulseAudio session and D-Bus session).
 """
 
 from __future__ import annotations
 
 import argparse
 import signal
+import subprocess
 import sys
 
 from . import __version__
 from .config import load_config, write_default_user_config
 from .utils import LOG, build_output_path, setup_logging
+
+_SERVICE = "meeting-recorder.service"
 
 
 def _cmd_run(cfg) -> int:
@@ -78,12 +89,72 @@ def _cmd_record(cfg) -> int:
     return 0
 
 
+# -- service control (wraps `systemctl --user` so callers don't have to) ----
+
+def _systemctl(*args: str) -> int:
+    try:
+        return subprocess.call(["systemctl", "--user", *args])
+    except FileNotFoundError:
+        print("systemctl not found — is systemd available?", file=sys.stderr)
+        return 1
+
+
+def _service_state() -> str:
+    """'active', 'inactive', 'failed', … or 'not-installed'."""
+    try:
+        out = subprocess.run(["systemctl", "--user", "is-active", _SERVICE],
+                             capture_output=True, text=True, timeout=5)
+        state = out.stdout.strip()
+        if state == "inactive":
+            # Distinguish "installed but stopped" from "unit doesn't exist".
+            shown = subprocess.run(
+                ["systemctl", "--user", "show", "-p", "LoadState",
+                 "--value", _SERVICE],
+                capture_output=True, text=True, timeout=5).stdout.strip()
+            if shown and shown != "loaded":
+                return "not-installed"
+        return state or "unknown"
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return "unknown"
+
+
+def _cmd_start(_cfg) -> int:
+    return _systemctl("start", _SERVICE)
+
+
+def _cmd_stop(_cfg) -> int:
+    return _systemctl("stop", _SERVICE)
+
+
+def _cmd_restart(_cfg) -> int:
+    return _systemctl("restart", _SERVICE)
+
+
+def _cmd_logs(_cfg) -> int:
+    try:
+        return subprocess.call(["journalctl", "--user", "-u", _SERVICE, "-f"])
+    except FileNotFoundError:
+        print("journalctl not found — is systemd available?", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 0
+
+
 def _cmd_status(cfg) -> int:
     from .detector import match_meeting_app, query_source_outputs
 
+    state = _service_state()
+    mark = {"active": "●", "failed": "✗"}.get(state, "○")
+    print(f"{mark} Service: {state}")
+    if state == "not-installed":
+        print("  (run from source? the background service isn't installed)")
+    elif state != "active":
+        print("  Start it with: meeting-recorder start")
+
+    print("\nActive capture streams:")
     outputs = query_source_outputs()
     if not outputs:
-        print("No active capture streams (or pactl unavailable).")
+        print("  none (or pactl unavailable)")
     for o in outputs:
         tag = " [monitor]" if o.is_monitor else ""
         print(f"  #{o.index} app={o.app_name!r} binary={o.binary!r} "
@@ -116,8 +187,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", action="version",
                         version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command")
-    for name in ("run", "record", "status", "config", "settings"):
-        sub.add_parser(name, parents=[common])
+    for name, help_text in (
+        ("status", "service state + detected capture streams"),
+        ("start", "start the background service"),
+        ("stop", "stop the background service"),
+        ("restart", "restart the service (apply setting changes)"),
+        ("logs", "follow the service log"),
+        ("settings", "open the settings window"),
+        ("run", "run the detector in the foreground"),
+        ("record", "record now until Ctrl-C"),
+        ("config", "create/print the user config file"),
+    ):
+        sub.add_parser(name, parents=[common], help=help_text)
 
     args = parser.parse_args(argv)
     setup_logging(args.verbose)
@@ -130,6 +211,10 @@ def main(argv: list[str] | None = None) -> int:
         "status": _cmd_status,
         "config": _cmd_config,
         "settings": _cmd_settings,
+        "start": _cmd_start,
+        "stop": _cmd_stop,
+        "restart": _cmd_restart,
+        "logs": _cmd_logs,
     }[command]
     return handler(cfg)
 

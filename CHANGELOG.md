@@ -31,7 +31,10 @@ First release.
 - **Capture area** — full screen, current window, or a selected region.
 - **Settings GUI** (`meeting-recorder settings`) for save folder, format, frame
   rate, volumes, normalization, noise cancellation and behavior.
-- **Background service** via systemd (`systemctl --user`), idling at a few MB of RAM.
+- **Background service** via systemd, idling at a few MB of RAM. `meeting-recorder
+  start|stop|restart|logs|status` wrap `systemctl --user`, so the `--user` flag is
+  never needed (it must be a *user* service: it needs your X display, audio and
+  D-Bus session).
 - Debian/Ubuntu `.deb` package.
 
 ### Notes / known limitations
