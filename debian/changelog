@@ -1,0 +1,14 @@
+meeting-recorder (0.1.1) noble; urgency=medium
+
+  * Add meeting-recorder start/stop/restart/logs wrappers around
+    systemctl --user, so the --user flag is not needed day to day.
+  * status now reports the background service state alongside the active
+    capture streams and the meeting match.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Fri, 17 Jul 2026 16:00:00 +0600
+
+meeting-recorder (0.1.0) noble; urgency=medium
+
+  * Initial release.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Fri, 17 Jul 2026 12:00:00 +0600

@@ -50,3 +50,29 @@ jobs:
         with:
           name: meeting-recorder-deb
           path: dist/*.deb
+
+  source-package:
+    name: Build source package (PPA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debhelper devscripts dpkg-dev lintian
+
+      # Launchpad builds from a *source* package, so the debian/ directory has to
+      # work on its own. Verify both the binary and source builds here, since
+      # they're what a PPA upload depends on.
+      - name: Build binary package from debian/
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Build source package (what dput uploads)
+        run: dpkg-buildpackage -us -uc -S -d
+
+      - name: Show what was produced
+        run: ls -la ../ | grep -E '\.(deb|dsc|tar\.[gx]z|changes)$' || true
+
+      - name: Lint
+        run: lintian ../*.deb || true

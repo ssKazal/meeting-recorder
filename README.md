@@ -43,8 +43,30 @@ screen. Wayland support is on the roadmap — see [Known limitations](#known-lim
 
 ## Install
 
-Download the `.deb` from [Releases](../../releases) and install it — `apt` pulls in ffmpeg and the
-rest automatically:
+### Option 1 — APT repository (recommended, auto-updates)
+
+```bash
+curl -fsSL https://sskazal.github.io/meeting-recorder/KEY.gpg \
+  | sudo gpg --dearmor -o /usr/share/keyrings/meeting-recorder.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://sskazal.github.io/meeting-recorder stable main" \
+  | sudo tee /etc/apt/sources.list.d/meeting-recorder.list
+
+sudo apt update && sudo apt install meeting-recorder
+```
+
+Updates then arrive with `apt upgrade` like any other package.
+
+### Option 2 — Ubuntu PPA
+
+```bash
+sudo add-apt-repository ppa:sskazal/meeting-recorder
+sudo apt update && sudo apt install meeting-recorder
+```
+
+### Option 3 — download the `.deb`
+
+Grab it from [Releases](../../releases) — `apt` pulls in ffmpeg and the rest automatically:
 
 ```bash
 sudo apt install ./meeting-recorder_0.1.1_all.deb

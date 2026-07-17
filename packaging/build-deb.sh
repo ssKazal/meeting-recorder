@@ -35,13 +35,8 @@ install -m 644 "$ROOT"/meeting_recorder/*.py "$SITE/"
 install -m 644 "$ROOT/meeting_recorder/default_config.json" "$SITE/"
 
 echo ">> staging entry point"
-cat > "$BUILD/usr/bin/$PKG" <<'EOF'
-#!/usr/bin/python3
-import sys
-from meeting_recorder.__main__ import main
-sys.exit(main())
-EOF
-chmod 755 "$BUILD/usr/bin/$PKG"
+# Same file the debian/ (PPA) build installs, so both paths stay identical.
+install -m 755 "$ROOT/packaging/meeting-recorder.bin" "$BUILD/usr/bin/$PKG"
 
 echo ">> staging service, desktop entry, icon, docs"
 install -m 644 "$ROOT/packaging/meeting-recorder.service" \
