@@ -29,7 +29,7 @@ microphone and system audio. Stops automatically when the call ends.</p>
 <h2>Install</h2>
 <pre><code>curl -fsSL https://ssKazal.github.io/meeting-recorder/KEY.gpg | sudo gpg --dearmor -o /usr/share/keyrings/meeting-recorder.gpg
 
-echo "deb [signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://ssKazal.github.io/meeting-recorder stable main" \
+echo "deb [arch=all signed-by=/usr/share/keyrings/meeting-recorder.gpg] https://ssKazal.github.io/meeting-recorder stable main" \
   | sudo tee /etc/apt/sources.list.d/meeting-recorder.list
 
 sudo apt update
