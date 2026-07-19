@@ -5,6 +5,11 @@ States: IDLE -> PROMPTING -> RECORDING -> IDLE.
 - User clicks Record: start the recorder.
 - Meeting ends      : stop + save, notify, return to IDLE.
 An ignored session is remembered so we don't re-prompt for the same call.
+
+Only two notifications are shown, deliberately: the Record/Ignore prompt, and
+the clickable "saved" result at the end (plus a failure notice, which would
+otherwise lose a recording silently). Progress and status are the tray icon's
+job — anything more is noise during a call.
 """
 
 from __future__ import annotations
@@ -33,6 +38,36 @@ class Controller:
         self._ignored_session = False
         self._widget = None          # floating RecordingWidget (if display present)
         self._timer_source = None    # GLib timeout id for the elapsed-time updates
+        self._session = None         # Wayland ScreenCast session, while recording
+        self._pending_path = None    # output path awaiting the portal handshake
+        self._run_done = False       # end-of-recording reported for this run?
+        self._manual = False         # started by `record`, not by the detector
+        # Called with the saved Path (or None) once a recording is fully
+        # finalized. `record` uses it to know when it can exit.
+        self.on_finished = None
+
+    # -- called by `record` (no detector involved) --------------------------
+    def start_manual(self, app_name: str = "Manual") -> None:
+        """Start recording right now, skipping detection and the prompt.
+
+        Goes through the same path as a detected meeting so a manual recording
+        gets the identical controls: tray icon (or pill), live timer, pause and
+        resume, and — on Wayland — the ScreenCast handshake.
+        """
+        if self.state is not State.IDLE:
+            LOG.warning("start_manual() ignored: already %s", self.state.value)
+            return
+        self._app = app_name
+        self._ignored_session = False
+        self._manual = True
+        self._begin_recording()
+
+    def stop_manual(self) -> None:
+        """Stop a manual recording; `on_finished` fires when the file is ready."""
+        if self.state is State.RECORDING:
+            self._finish_recording()
+        self.state = State.IDLE
+        self._app = None
 
     # -- called by the detector --------------------------------------------
     def on_meeting_start(self, app_name: str) -> None:
@@ -73,35 +108,104 @@ class Controller:
 
     # -- recording helpers -------------------------------------------------
     def _begin_recording(self) -> None:
-        app = self._app or "Meeting"
-        path = build_output_path(self.cfg.output_dir, app, self.cfg.container)
+        path = build_output_path(self.cfg.output_dir, self._app or "Meeting",
+                                 self.cfg.container)
+        self.state = State.RECORDING
+        self._run_done = False
+        # Show the controls straight away, before any capture starts. On Wayland
+        # the portal handshake happens first and can take seconds (or stall on a
+        # dialog), and leaving the screen empty in the meantime reads as "Record
+        # did nothing" — the tray icon is the only feedback the user gets.
+        self._show_widget()
+        if self._needs_portal():
+            # Wayland: the compositor must hand us a stream before we can
+            # capture anything, and that handshake is asynchronous.
+            self._pending_path = path
+            self._open_portal()
+            return
+        self._start_capture(path)
+
+    def _needs_portal(self) -> bool:
+        if not self.cfg.record_screen:
+            return False
+        from .screencast import use_portal_capture
+        return use_portal_capture()
+
+    def _open_portal(self) -> None:
+        from .screencast import ScreenCastSession, source_types_for
+        # No "preparing" notification: the portal puts its own dialog on screen,
+        # which is a clearer prompt than anything we could add next to it.
+        self._session = ScreenCastSession()
+        self._session.open(source_types_for(self.cfg.capture_mode),
+                           self.cfg.wayland_restore_token,
+                           self._on_portal_ready, self._on_portal_error)
+
+    def _on_portal_ready(self, session) -> None:
+        if self.state is not State.RECORDING or self._pending_path is None:
+            session.close()  # the call ended while the dialog was still up
+            return
+        if session.restore_token:
+            from .config import save_restore_token
+            save_restore_token(session.restore_token)
+        self.recorder.attach_session(session)
+        path, self._pending_path = self._pending_path, None
+        self._start_capture(path)
+
+    def _on_portal_error(self, message: str) -> None:
+        if self.state is not State.RECORDING or self._pending_path is None:
+            return
+        LOG.warning("Screen capture unavailable (%s); recording audio only",
+                    message)
+        self._session = None
+        path, self._pending_path = self._pending_path, None
+        self._start_capture(path)
+
+    def _start_capture(self, path) -> None:
+        self._run_done = False
         self.recorder.start(path)
         self.state = State.RECORDING
-        self._show_widget()
-        if self._widget is None:
-            # No tray icon / pill to show status, so a notification is the only
-            # signal that recording began. With controls visible it's redundant.
-            self.notifier.info("Recording started", f"{app} — saving to {path.name}")
+        self._show_widget()  # no-op when _begin_recording already showed it
 
     def _finish_recording(self, trim_end: float = 0.0) -> None:
         self._close_widget()
-        too_short = self.recorder.elapsed() - trim_end < self.cfg.min_recording_seconds
+        if not self.recorder.is_recording:
+            # The call ended while the portal dialog was still up.
+            self._close_portal()
+            self._run_complete(None)
+            return
+        # min_recording_seconds exists to drop false-positive meeting detections;
+        # a manual `record` was asked for explicitly, so it always saves.
+        too_short = (not self._manual and
+                     self.recorder.elapsed() - trim_end < self.cfg.min_recording_seconds)
         if too_short:
             self.recorder.stop(discard=True)
-            self.notifier.info("Recording discarded", "Call was too short to save.")
+            self._close_portal()
+            LOG.info("Discarded: call was shorter than min_recording_seconds")
+            self._run_complete(None)
             return
-        if not self.recorder.stop(trim_end=trim_end):
-            self.notifier.info("Recording stopped", "No file was saved.")
+        started = self.recorder.stop(trim_end=trim_end)
+        # After stop(): capture is torn down, so the portal stream is free to go.
+        self._close_portal()
+        if not started:
+            LOG.warning("Recording stopped but no file was saved")
+            self._run_complete(None)
             return
         # Finalize (denoise + normalize + mix) runs in the background so the
         # daemon stays responsive; poll it and notify when the file is ready.
-        self.notifier.info("Processing recording…", "Balancing audio — almost done.")
         try:
             from gi.repository import GLib
             GLib.timeout_add(1000, self._poll_finalize)
         except Exception:  # pragma: no cover - no GLib: fall back to blocking
             path = self.recorder.wait_finalize()
             self._notify_finalized(path)
+
+    def _close_portal(self) -> None:
+        """Release the ScreenCast session so the compositor stops the stream."""
+        session, self._session = self._session, None
+        self._pending_path = None
+        self.recorder.attach_session(None)
+        if session is not None:
+            session.close()
 
     def _poll_finalize(self) -> bool:
         done, path = self.recorder.poll_finalize()
@@ -110,7 +214,19 @@ class Controller:
         self._notify_finalized(path)
         return False
 
+    def _run_complete(self, path) -> None:
+        """Fire the end-of-recording hook exactly once for this run."""
+        if self._run_done:
+            return
+        self._run_done = True
+        if self.on_finished:
+            self.on_finished(path)
+
     def _notify_finalized(self, path) -> None:
+        # shutdown() can block on the finalize that _poll_finalize is already
+        # watching, so both can land here for one recording — report once.
+        if self._run_done:
+            return
         # These stay on screen until dismissed: "saved" is clickable (opening the
         # folder), and a failure needs to be seen.
         if path is None:
@@ -124,9 +240,12 @@ class Controller:
                 click_label="📁 Open Folder",
                 persistent=True,
             )
+        self._run_complete(path)
 
     # -- recording controls (tray icon, or floating pill fallback) ---------
     def _show_widget(self) -> None:
+        if self._widget is not None:
+            return  # already on screen; called from both start paths
         self._widget = self._build_controls()
         if self._widget is None:
             return

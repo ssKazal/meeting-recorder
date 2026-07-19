@@ -43,6 +43,8 @@ install -m 644 "$ROOT/packaging/meeting-recorder.service" \
                "$BUILD/usr/lib/systemd/user/meeting-recorder.service"
 install -m 644 "$ROOT/packaging/meeting-recorder-settings.desktop" \
                "$BUILD/usr/share/applications/meeting-recorder-settings.desktop"
+install -m 644 "$ROOT/packaging/meeting-recorder.desktop" \
+               "$BUILD/usr/share/applications/meeting-recorder.desktop"
 install -m 644 "$ROOT/packaging/meeting-recorder.svg" \
                "$BUILD/usr/share/icons/hicolor/scalable/apps/meeting-recorder.svg"
 gzip -9nc "$ROOT/packaging/meeting-recorder.1" \

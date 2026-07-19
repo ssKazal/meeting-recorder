@@ -106,6 +106,13 @@ class RecordingWidget:
         self.win.destroy()
 
     def _position(self) -> bool:
+        from .screencast import is_wayland
+        if is_wayland():
+            # Wayland clients cannot place their own windows: Gtk.Window.move()
+            # is a no-op and Mutter has no layer-shell protocol. The pill still
+            # works, the compositor just decides where it goes.
+            LOG.info("Wayland: the compositor positions the recording controls")
+            return False
         try:
             display = Gdk.Display.get_default()
             monitor = (display.get_primary_monitor()

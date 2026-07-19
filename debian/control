@@ -20,9 +20,14 @@ Depends: ${misc:Depends},
          gir1.2-appindicator3-0.1,
          ffmpeg,
          pulseaudio-utils,
-         x11-utils,
-         x11-xserver-utils
-Recommends: gnome-shell-extension-appindicator
+         xdg-desktop-portal,
+         gstreamer1.0-pipewire,
+         gstreamer1.0-plugins-base,
+         gstreamer1.0-plugins-good,
+         gstreamer1.0-tools
+Recommends: gnome-shell-extension-appindicator,
+            x11-utils,
+            x11-xserver-utils
 Suggests: slop
 Description: Automatic meeting recorder for Linux desktops
  Smart Meeting Recorder runs quietly in the background and notices when you join
@@ -40,5 +45,6 @@ Description: Automatic meeting recorder for Linux desktops
  loudness-normalised so both voices come out at a comparable level, and
  background noise is filtered from the mic.
  .
- Note: this release captures the screen via X11 (x11grab) and does not yet
- support Wayland sessions.
+ Both X11 and Wayland sessions are supported. On Wayland the screen is captured
+ through the xdg-desktop-portal ScreenCast interface, so the desktop asks you to
+ approve screen sharing the first time; the choice is remembered afterwards.

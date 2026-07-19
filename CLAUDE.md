@@ -4,15 +4,13 @@ Context primer for AI assistants. Read this first; open source files only as nee
 
 ## Don't
 
-- **Never `git push`.** The maintainer pushes manually, after reviewing the diff. Never push to
-  `main`, never push tags, never `--force`. This applies even when a task seems to imply it
-  ("release it", "ship it") — prepare the work and stop.
-- **Never commit without asking first.** Show what changed (`git status` / `git diff`) and wait for
-  an explicit go-ahead so the maintainer can review it. Staging is fine; committing is not.
+- **Never `git push` unless the maintainer explicitly asks you to.** By default the maintainer
+  reviews the diff and pushes manually. Never use `--force`. Do not push to `main` unless the
+  maintainer explicitly instructs you to do so.
 - **Never add a `Co-Authored-By: Claude ...` trailer** (or any similar attribution line) to commit
   messages. Write the message as the maintainer would; no tool attribution.
-- **Never create GitHub releases, or publish to the APT repo / any distribution channel.**
-- **Don't run `sudo`** — hand the maintainer the exact command instead.
+- **Never run `sudo` without the maintainer's explicit approval.** If `sudo` is required, ask for
+  permission first before executing the command.
 - **Don't delete recordings, `~/.config/meeting-recorder/`, or anything under
   `~/Videos/MeetingRecorder/`** without explicit permission. Build artifacts and `/tmp` scratch are
   fine to clean.
@@ -34,7 +32,7 @@ never records without consent.
 - **Debounce** avoids flapping: ~3s sustained presence to start, ~5s absence to stop.
 - **Popup** via libnotify (`gi.repository.Notify`) with Record/Ignore buttons.
 - **Recording is two-stage** (this is the core design — don't put audio filters back in the live path):
-  1. *Live capture*: `x11grab` video + mic and system audio as **separate, unfiltered** tracks.
+  1. *Live capture*: video + mic and system audio as **separate, unfiltered** tracks.
      No filters ⇒ no latency ⇒ segments can be any length.
   2. *Finalize* (`build_finalize_cmd`): concat segments, then denoise + per-source `loudnorm`
      + `amix` + limiter, **video stream-copied**. Runs as a **background** Popen polled from the
@@ -43,14 +41,34 @@ never records without consent.
   (`SIGSTOP` does NOT work — input queues keep buffering and the paused span gets encoded on resume.)
 - **Why loudnorm can't run live**: it buffers ~3s, which (a) silently truncated the last ~3s of every
   recording and (b) makes a clean pause boundary impossible. Output `.mkv` named `<App>_<timestamp>`.
+- **Two capture backends, one ffmpeg** (`screencast.use_portal_capture()` picks; override with
+  `MEETING_RECORDER_CAPTURE=portal|x11`):
+  - *X11*: `-f x11grab -i $DISPLAY+x,y`, geometry from xrandr/xprop/xwininfo.
+  - *Wayland*: the compositor owns the screen, so we ask `xdg-desktop-portal`'s ScreenCast API for
+    a PipeWire node. **ffmpeg has no PipeWire input device**, so a `gst-launch-1.0 pipewiresrc`
+    pump (`build_pipewire_cmd`) converts to raw I420 and writes it into a **FIFO** that ffmpeg
+    reads as `-f rawvideo`. The pump does *no* encoding — ffmpeg still owns every encode decision,
+    keeps one clock for A/V, and `build_finalize_cmd` is untouched.
+    - It must be a FIFO, **not stdin**: `_stop_proc` writes `q` to ffmpeg's stdin to end a segment.
+    - The pump writes the FIFO itself (`filesink`) so the open-blocks-until-both-ends wait happens
+      in the child, never in the daemon's GLib loop.
+    - The portal handshake (`CreateSession`→`SelectSources`→`Start`) is **async** and needs the
+      GLib loop; `persist_mode=2` returns a `restore_token` (stored in config) so the user is only
+      prompted once. `OpenPipeWireRemote` is sync and gives a fresh fd per segment, so pause/resume
+      never re-prompts.
+    - No portal permission ⇒ **audio-only**, never a silently-black video.
 - **Startup stall fix**: `-tune zerolatency` + `-thread_queue_size 1024` (otherwise x11grab starves
   and the first ~3s is a frozen black screen).
 - Everything runs on one **GLib main loop**; ships as a `systemctl --user` service.
 
 ## Environment assumptions
-Ubuntu 24.04, **X11** (uses x11grab; Wayland is a TODO), GNOME, **PipeWire**. Runs on system
-`python3` using system PyGObject — **no pip dependencies**. Requires apt: `ffmpeg`,
-`pulseaudio-utils`, `gir1.2-notify-0.7`, `x11-xserver-utils`.
+Ubuntu 24.04, **X11 or Wayland**, GNOME, **PipeWire**. Runs on system `python3` using system
+PyGObject — **no pip dependencies**. Requires apt: `ffmpeg`, `pulseaudio-utils`,
+`gir1.2-notify-0.7`; `xdg-desktop-portal` + `gstreamer1.0-pipewire` for Wayland capture,
+`x11-xserver-utils` + `x11-utils` for X11 capture.
+
+Wayland caveats: `Gtk.Window.move()` is a no-op (the compositor places the control pill) and
+`slop` region-select is X11-only.
 
 ## Structure (`meeting_recorder/`)
 | File | Responsibility |
@@ -59,7 +77,8 @@ Ubuntu 24.04, **X11** (uses x11grab; Wayland is a TODO), GNOME, **PipeWire**. Ru
 | `config.py` | Load `config/default_config.json` + user `~/.config/meeting-recorder/config.json` |
 | `detector.py` | **Core.** Parse pactl, allowlist match, `DebounceMachine`, `MeetingDetector` poller |
 | `audio.py` | Resolve default mic source + sink monitor via pactl |
-| `recorder.py` | `build_ffmpeg_cmd` (pure) + `Recorder` process lifecycle |
+| `recorder.py` | `build_ffmpeg_cmd` / `build_pipewire_cmd` (pure) + `Recorder` process lifecycle |
+| `screencast.py` | Wayland: `use_portal_capture()`, ScreenCast portal D-Bus handshake, PipeWire fd |
 | `notifier.py` | libnotify popup with action buttons (+ `notify-send` fallback); info notifications auto-dismiss ~2s |
 | `recording_widget.py` | Floating top-right GTK3 pill: blinking dot, timer, pause/resume/stop |
 | `settings_gui.py` | GTK3 settings window (`settings` subcommand); edits user config |
@@ -67,7 +86,8 @@ Ubuntu 24.04, **X11** (uses x11grab; Wayland is a TODO), GNOME, **PipeWire**. Ru
 | `utils.py` | paths, filenames, logging |
 
 `tests/` — zero-dep runner: `python3 tests/run_tests.py` (no pytest needed). Pure functions
-(`parse_source_outputs`, `match_meeting_app`, `DebounceMachine`, `build_ffmpeg_cmd`) are the
+(`parse_source_outputs`, `match_meeting_app`, `DebounceMachine`, `build_ffmpeg_cmd`,
+`build_pipewire_cmd`) are the
 unit-test surface. `systemd/`, `scripts/install.sh` handle packaging.
 
 ## Conventions

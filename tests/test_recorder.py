@@ -1,5 +1,6 @@
 """Unit tests for the two-stage capture/finalize ffmpeg command construction."""
 
+import os
 from pathlib import Path
 
 from meeting_recorder.config import load_config
@@ -8,7 +9,9 @@ from meeting_recorder.recorder import (
     audio_roles,
     build_ffmpeg_cmd,
     build_finalize_cmd,
+    build_pipewire_cmd,
     parse_region,
+    pipewire_capture_size,
     video_geometry,
 )
 
@@ -77,6 +80,68 @@ def test_capture_audio_only_has_no_video():
     assert "-map 0:a" in joined            # mic becomes input 0
 
 
+# -- stage 1 on Wayland: portal stream instead of x11grab -----------------
+
+def _wayland_dev(size="1920x1080", fifo="/tmp/seg.fifo"):
+    return CaptureDevices(display=":0", video_size=size, video_x=0, video_y=0,
+                          mic_source="mic_src", monitor_source="sink.monitor",
+                          video_fifo=fifo)
+
+
+def test_capture_wayland_reads_rawvideo_not_x11grab():
+    """With a FIFO set, video comes from the PipeWire pump, not the X display."""
+    cmd = build_ffmpeg_cmd(
+        _cfg(record_screen=True, record_mic=True, record_system_audio=True),
+        OUT, _wayland_dev())
+    joined = " ".join(cmd)
+    assert "x11grab" not in cmd
+    assert "-f rawvideo -pix_fmt yuv420p -framerate 30 -video_size 1920x1080" in joined
+    assert "-i /tmp/seg.fifo" in joined
+    assert cmd.count("-f") == 3            # rawvideo + 2 pulse inputs
+    # Everything downstream of the input must be identical to the X11 path.
+    assert "-map 0:v" in joined and "-map 1:a -map 2:a" in joined
+    assert "-tune zerolatency" in joined
+    for f in ("loudnorm", "amix", "filter_complex"):
+        assert f not in joined, f"{f} must not run during live capture"
+
+
+def test_pipewire_pump_matches_the_caps_ffmpeg_expects():
+    """The pump must emit exactly what build_ffmpeg_cmd declares as its input."""
+    cfg = _cfg(record_screen=True)
+    cmd = build_pipewire_cmd(cfg, node_id=42, fd=7, size="1920x1080",
+                             fifo="/tmp/seg.fifo")
+    joined = " ".join(cmd)
+    assert "pipewiresrc fd=7 path=42" in joined
+    assert "video/x-raw,format=I420,width=1920,height=1080" in joined
+    assert "framerate=30/1" in joined
+    assert "filesink location=/tmp/seg.fifo" in joined
+    assert "videocrop" not in joined       # no cropping for fullscreen
+    # No encoder in the pump: ffmpeg owns every encode decision.
+    for enc in ("x264enc", "vp8enc", "matroskamux"):
+        assert enc not in joined
+
+
+def test_pipewire_pump_crops_for_area_capture():
+    """'area' has no portal equivalent, so the region is cropped in the pump."""
+    cfg = _cfg(record_screen=True, capture_mode="area",
+               capture_region="100,50,800,600")
+    joined = " ".join(build_pipewire_cmd(cfg, 42, 7, "1920x1080", "/tmp/seg.fifo",
+                                         crop=(100, 50, 800, 600)))
+    assert "videocrop left=100 top=50 right=1020 bottom=430" in joined
+    assert "width=800,height=600" in joined
+
+
+def test_pipewire_capture_size_uses_region_then_stream():
+    assert pipewire_capture_size(_cfg(capture_mode="fullscreen"), (1920, 1080)) == "1920x1080"
+    assert pipewire_capture_size(
+        _cfg(capture_mode="area", capture_region="0,0,800,600"), (1920, 1080)) == "800x600"
+    # Odd sizes get rounded down: x264/yuv420p needs even dimensions.
+    assert pipewire_capture_size(_cfg(capture_mode="fullscreen"), (1367, 769)) == "1366x768"
+    # A bad region falls back to the whole stream rather than failing.
+    assert pipewire_capture_size(
+        _cfg(capture_mode="area", capture_region="bogus"), (1920, 1080)) == "1920x1080"
+
+
 def test_audio_roles_order():
     assert audio_roles(_cfg(record_mic=True, record_system_audio=True)) == ["mic", "system"]
     assert audio_roles(_cfg(record_mic=False, record_system_audio=True)) == ["system"]
@@ -93,8 +158,13 @@ def test_finalize_normalizes_both_sources_and_copies_video():
         LIST, OUT, ["mic", "system"])
     joined = " ".join(cmd)
     assert "-f concat -safe 0 -i /tmp/list.txt" in joined
-    # Mic: highpass -> denoise -> loudnorm -> volume
-    assert ("[0:a:0]highpass=f=90,afftdn=nr=20:nf=-30:tn=1,"
+    # Mic: highpass -> denoise -> GATE -> loudnorm -> volume.
+    # The gate must come *before* loudnorm: loudnorm applies whatever gain
+    # reaches -23 LUFS, so any room tone still present here gets amplified
+    # with the voice (measured: the ungated chain was 9 dB louder than the
+    # raw mic on a silent room).
+    assert ("[0:a:0]highpass=f=90,afftdn=nr=25:nf=-35:tn=1,"
+            "agate=threshold=0.02:ratio=6:attack=10:release=300,"
             "loudnorm=I=-23:TP=-2,volume=1.0[a0]") in joined
     # System: loudnorm -> volume (same target => equal voices)
     assert "[0:a:1]loudnorm=I=-23:TP=-2,volume=1.0[a1]" in joined
@@ -125,8 +195,14 @@ def test_finalize_normalization_can_be_disabled():
 def test_finalize_noise_cancellation_toggle():
     on = " ".join(build_finalize_cmd(_cfg(noise_cancellation=True), LIST, OUT, ["mic"]))
     off = " ".join(build_finalize_cmd(_cfg(noise_cancellation=False), LIST, OUT, ["mic"]))
-    assert "afftdn=nr=20:nf=-30:tn=1" in on
+    assert "afftdn=nr=25:nf=-35:tn=1" in on
     assert "afftdn" not in off
+    # The gate is part of noise cancellation, so it follows the same switch.
+    assert "agate=" in on
+    assert "agate" not in off
+    # Gate before loudnorm, or loudnorm just amplifies what the gate would
+    # have removed.
+    assert on.index("agate=") < on.index("loudnorm")
 
 
 def test_finalize_without_audio_just_copies_video():
@@ -174,8 +250,12 @@ def test_pause_resume_creates_segments_and_tracks_elapsed():
 
     orig = (rec.subprocess.Popen, rec.resolve_devices, rec.build_ffmpeg_cmd)
     rec.subprocess.Popen = FakeProc
-    rec.resolve_devices = lambda cfg: None
+    rec.resolve_devices = lambda cfg, session=None: None
     rec.build_ffmpeg_cmd = lambda cfg, out, dev: ["true"]
+    # This test is about segment bookkeeping, not capture backends — pin the
+    # backend so it behaves the same on an X11 and a Wayland machine.
+    prev_backend = os.environ.get("MEETING_RECORDER_CAPTURE")
+    os.environ["MEETING_RECORDER_CAPTURE"] = "x11"
     try:
         r = rec.Recorder(load_config())
         r.start(Path("/tmp/seg.mkv"))
@@ -190,6 +270,40 @@ def test_pause_resume_creates_segments_and_tracks_elapsed():
         assert r._parts[1].name == ".seg.part1.mkv"
     finally:
         (rec.subprocess.Popen, rec.resolve_devices, rec.build_ffmpeg_cmd) = orig
+        if prev_backend is None:
+            os.environ.pop("MEETING_RECORDER_CAPTURE", None)
+        else:
+            os.environ["MEETING_RECORDER_CAPTURE"] = prev_backend
+
+
+def test_finalize_drops_video_when_none_was_captured():
+    """A denied screen-share must still save the audio.
+
+    Regression: finalize mapped 0:v from cfg.record_screen even when the
+    segments were audio-only, so ffmpeg failed and the whole recording was lost.
+    """
+    import meeting_recorder.recorder as rec
+
+    r = rec.Recorder(_cfg(record_screen=True, record_mic=True,
+                          record_system_audio=False))
+    r._has_video = False                       # portal was denied
+    captured = {}
+
+    def fake_finalize(cfg, *a, **k):
+        captured["record_screen"] = cfg.record_screen
+        return ["true"]
+
+    orig = rec.build_finalize_cmd
+    rec.build_finalize_cmd = fake_finalize
+    orig_popen = rec.subprocess.Popen
+    rec.subprocess.Popen = lambda *a, **k: None
+    try:
+        r._start_finalize([Path("/tmp/.a.part0.mkv")], Path("/tmp/a.mkv"))
+    finally:
+        rec.build_finalize_cmd = orig
+        rec.subprocess.Popen = orig_popen
+        Path("/tmp/.a.concat.txt").unlink(missing_ok=True)
+    assert captured["record_screen"] is False
 
 
 def test_finalize_trims_tail_when_duration_given():

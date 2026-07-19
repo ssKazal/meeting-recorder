@@ -22,10 +22,11 @@ subprocess lifecycle.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from . import audio
@@ -34,6 +35,9 @@ from .utils import LOG, expand_path
 
 _LIMITER = "alimiter=limit=0.95"
 _LOUDNORM = "loudnorm=I=-23:TP=-2"
+# threshold=0.02 is about -34 dBFS: well under speech, above room tone. The
+# slow release avoids the background "pumping" audibly between words.
+_GATE = "agate=threshold=0.02:ratio=6:attack=10:release=300"
 
 
 def screen_resolution(default: str = "1920x1080") -> str:
@@ -114,11 +118,22 @@ class CaptureDevices:
     video_y: int          # top offset on the X display
     mic_source: str
     monitor_source: str
+    # Wayland only: FIFO carrying raw frames from the PipeWire pump. When set,
+    # ffmpeg reads rawvideo from it instead of grabbing the X display.
+    video_fifo: str | None = None
 
 
-def resolve_devices(cfg: Config) -> CaptureDevices:
-    import os
-    x, y, size = video_geometry(cfg)
+def resolve_devices(cfg: Config, session=None) -> CaptureDevices:
+    """Resolve the capture sources for one segment.
+
+    With a `session` (an open `screencast.ScreenCastSession`) the video comes
+    from the portal's PipeWire stream and its size is whatever the compositor
+    gave us; otherwise this is the X11 path and geometry comes from xrandr.
+    """
+    if session is not None and session.size:
+        x, y, size = 0, 0, pipewire_capture_size(cfg, session.size)
+    else:
+        x, y, size = video_geometry(cfg)
     return CaptureDevices(
         display=os.environ.get("DISPLAY", ":0"),
         video_size=size,
@@ -127,6 +142,53 @@ def resolve_devices(cfg: Config) -> CaptureDevices:
         mic_source=audio.default_source(),
         monitor_source=audio.monitor_source(),
     )
+
+
+def build_pipewire_cmd(cfg: Config, node_id: int, fd: int, size: str,
+                       fifo: Path | str,
+                       crop: tuple[int, int, int, int] | None = None) -> list[str]:
+    """GStreamer pipeline pumping a portal stream into `fifo` as raw I420.
+
+    This exists only because ffmpeg has no PipeWire input device. It does no
+    encoding — it converts to exactly the caps `build_ffmpeg_cmd` declares for
+    its rawvideo input, so ffmpeg still owns every encode decision.
+
+    The pipeline writes to the FIFO itself rather than to a pipe we hold, so
+    the open-blocks-until-both-ends-are-there wait happens in this child and
+    never in the daemon's main loop.
+
+    `crop` is (x, y, w, h) for "area" capture: the portal always hands over a
+    whole monitor or window, so the region is trimmed here instead.
+    """
+    width, height = (int(p) for p in size.split("x"))
+    pipeline = [
+        "pipewiresrc", f"fd={fd}", f"path={node_id}", "do-timestamp=true",
+        "!", "videorate",
+        "!", f"video/x-raw,framerate={cfg.framerate}/1",
+    ]
+    if crop:
+        cx, cy, cw, ch = crop
+        pipeline += ["!", "videocrop", f"left={cx}", f"top={cy}",
+                     f"right={max(0, width - cx - cw)}",
+                     f"bottom={max(0, height - cy - ch)}"]
+        width, height = _even(cw), _even(ch)
+    pipeline += [
+        "!", "videoconvert", "!", "videoscale",
+        "!", f"video/x-raw,format=I420,width={width},height={height}",
+        "!", "filesink", f"location={fifo}", "sync=false",
+    ]
+    return ["gst-launch-1.0", "-q"] + pipeline
+
+
+def pipewire_capture_size(cfg: Config, session_size: tuple[int, int]) -> str:
+    """The 'WxH' ffmpeg will receive: the stream size, or the cropped region."""
+    if cfg.capture_mode == "area":
+        geo = parse_region(cfg.capture_region)
+        if geo:
+            return f"{_even(geo[2])}x{_even(geo[3])}"
+        LOG.warning("No valid capture_region; using the full portal stream")
+    w, h = session_size
+    return f"{_even(w)}x{_even(h)}"
 
 
 def audio_roles(cfg: Config) -> list[str]:
@@ -154,9 +216,17 @@ def build_ffmpeg_cmd(cfg: Config, output_path: Path, dev: CaptureDevices) -> lis
     next_index = 0
 
     if cfg.record_screen:
-        cmd += tqs + ["-f", "x11grab", "-framerate", str(cfg.framerate),
-                      "-video_size", dev.video_size,
-                      "-i", f"{dev.display}+{dev.video_x},{dev.video_y}"]
+        if dev.video_fifo:
+            # Wayland: frames arrive as raw I420 from the PipeWire pump. ffmpeg
+            # cannot read PipeWire itself, so the pump does that part.
+            cmd += tqs + ["-f", "rawvideo", "-pix_fmt", "yuv420p",
+                          "-framerate", str(cfg.framerate),
+                          "-video_size", dev.video_size,
+                          "-i", dev.video_fifo]
+        else:
+            cmd += tqs + ["-f", "x11grab", "-framerate", str(cfg.framerate),
+                          "-video_size", dev.video_size,
+                          "-i", f"{dev.display}+{dev.video_x},{dev.video_y}"]
         next_index += 1  # video occupies input 0
 
     audio_indices: list[int] = []
@@ -199,7 +269,15 @@ def _mic_chain(cfg: Config) -> list[str]:
         if model and model.is_file():
             chain.append(f"arnndn=m={model}")
         else:
-            chain.append("afftdn=nr=20:nf=-30:tn=1")
+            chain.append("afftdn=nr=25:nf=-35:tn=1")
+        # Gate the room tone that survives denoising, and do it *before*
+        # loudnorm. Order matters more than strength here: loudnorm applies
+        # whatever gain reaches -23 LUFS, so anything still audible at this
+        # point gets amplified along with the voice — measured on a silent
+        # room, the old chain ended up 9 dB *louder* than the raw mic.
+        # Soft-knee (ratio 6, not infinite) so quiet speech ducks rather than
+        # being chopped off mid-word.
+        chain.append(_GATE)
     if cfg.normalize_voice:
         chain.append(_LOUDNORM)
     chain.append(f"volume={cfg.mic_volume}")
@@ -258,9 +336,19 @@ class Recorder:
     finalize pass (video stream-copied), so paused time never reaches the file.
     """
 
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, session=None):
         self.cfg = cfg
+        # Wayland: an open screencast.ScreenCastSession supplying the video.
+        # None on X11, where ffmpeg grabs the display directly.
+        self._session = session
         self._proc: subprocess.Popen | None = None
+        self._pump: subprocess.Popen | None = None
+        self._fifo: Path | None = None
+        # Whether this run's segments actually contain a video stream. Decided
+        # by the first segment and then held for the rest of the run: concat
+        # needs every segment to have the same layout, and finalize must map
+        # only streams that are really there.
+        self._has_video: bool | None = None
         self._final_path: Path | None = None
         self._parts: list[Path] = []
         self._accum: float = 0.0        # active seconds from finished segments
@@ -291,6 +379,7 @@ class Recorder:
         self._parts = []
         self._accum = 0.0
         self._paused = False
+        self._has_video = None   # decided by the first segment, see _start_segment
         LOG.info("Recording -> %s", output_path)
         self._start_segment()
 
@@ -392,8 +481,20 @@ class Recorder:
         assert self._final_path is not None
         part = self._final_path.with_name(
             f".{self._final_path.stem}.part{len(self._parts)}{self._final_path.suffix}")
-        dev = resolve_devices(self.cfg)
-        cmd = build_ffmpeg_cmd(self.cfg, part, dev)
+        dev = resolve_devices(self.cfg, self._session)
+        cfg = self.cfg
+        if self._wants_pipewire and self._has_video is not False:
+            self._start_pump(part, dev)
+            if not dev.video_fifo:
+                # Wayland with no working pump: x11grab would capture nothing,
+                # so keep the audio rather than writing a black video.
+                LOG.warning("Falling back to audio-only for this recording")
+        if self._has_video is None:
+            self._has_video = bool(cfg.record_screen and
+                                   (not self._wants_pipewire or dev.video_fifo))
+        if not self._has_video:
+            cfg = replace(cfg, record_screen=False)
+        cmd = build_ffmpeg_cmd(cfg, part, dev)
         LOG.debug("capture cmd: %s", " ".join(cmd))
         self._proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE,
@@ -402,32 +503,111 @@ class Recorder:
         self._parts.append(part)
         self._run_start = time.monotonic()
 
+    @property
+    def _wants_pipewire(self) -> bool:
+        """True when video must come from the portal rather than x11grab.
+
+        Keyed on the session type, not on whether a session exists: if the
+        portal was denied there is still no display to grab, so the segment has
+        to degrade to audio-only instead of silently recording a black screen.
+        """
+        from .screencast import use_portal_capture
+        return bool(self.cfg.record_screen and use_portal_capture())
+
+    def attach_session(self, session) -> None:
+        """Supply the open ScreenCastSession that video will be pumped from."""
+        self._session = session
+
+    def _start_pump(self, part: Path, dev: CaptureDevices) -> None:
+        """Start the GStreamer PipeWire->FIFO pump for one Wayland segment.
+
+        A fresh fd per segment: OpenPipeWireRemote is a plain call with no
+        dialog, so resuming after a pause costs nothing and asks nothing.
+        """
+        from .screencast import ScreenCastError
+
+        if self._session is None or not self._session.is_open:
+            LOG.warning("No screen-capture permission; recording audio only")
+            return
+        fifo = part.with_suffix(".fifo")
+        fifo.unlink(missing_ok=True)
+        try:
+            os.mkfifo(fifo, 0o600)
+            fd = self._session.open_fd()
+        except (OSError, ScreenCastError) as exc:
+            LOG.error("Could not set up Wayland capture: %s", exc)
+            fifo.unlink(missing_ok=True)
+            return
+        self._fifo = fifo
+        dev.video_fifo = str(fifo)
+
+        crop = None
+        if self.cfg.capture_mode == "area":
+            crop = parse_region(self.cfg.capture_region)
+        cmd = build_pipewire_cmd(self.cfg, self._session.node_id, fd,
+                                 f"{self._session.size[0]}x{self._session.size[1]}",
+                                 fifo, crop)
+        LOG.debug("pipewire pump cmd: %s", " ".join(cmd))
+        try:
+            os.set_inheritable(fd, True)
+            self._pump = subprocess.Popen(
+                cmd, pass_fds=(fd,),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+        except OSError as exc:
+            LOG.error("Could not start the PipeWire pump: %s", exc)
+            dev.video_fifo = None
+            self._cleanup_pump()
+        finally:
+            os.close(fd)  # the child holds its own copy now
+
     def _stop_proc(self) -> None:
         proc = self._proc
         self._proc = None
-        if proc is None or proc.poll() is not None:
-            return
-        try:
-            if proc.stdin:
-                proc.stdin.write(b"q")
-                proc.stdin.flush()
-                proc.stdin.close()
-            proc.wait(timeout=8)
-        except (subprocess.TimeoutExpired, BrokenPipeError, OSError):
-            LOG.warning("ffmpeg did not quit cleanly; terminating")
-            proc.terminate()
+        if proc is not None and proc.poll() is None:
             try:
-                proc.wait(timeout=5)
+                if proc.stdin:
+                    proc.stdin.write(b"q")
+                    proc.stdin.flush()
+                    proc.stdin.close()
+                proc.wait(timeout=8)
+            except (subprocess.TimeoutExpired, BrokenPipeError, OSError):
+                LOG.warning("ffmpeg did not quit cleanly; terminating")
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+        # Only now: the pump dies of SIGPIPE once ffmpeg drops the FIFO anyway,
+        # but stopping it first would truncate the tail of the segment.
+        self._cleanup_pump()
+
+    def _cleanup_pump(self) -> None:
+        pump, self._pump = self._pump, None
+        if pump is not None and pump.poll() is None:
+            pump.terminate()
+            try:
+                pump.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                proc.kill()
+                LOG.warning("PipeWire pump did not exit; killing")
+                pump.kill()
+        if self._fifo is not None:
+            self._fifo.unlink(missing_ok=True)
+            self._fifo = None
 
     def _start_finalize(self, parts: list[Path], dest: Path,
                         duration: float | None = None) -> None:
         listfile = dest.with_name(f".{dest.stem}.concat.txt")
         listfile.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts),
                             encoding="utf-8")
-        cmd = build_finalize_cmd(self.cfg, listfile, dest, audio_roles(self.cfg),
-                                 duration)
+        # Map only what the segments really contain: if screen capture was
+        # never granted, asking for 0:v here would fail the whole finalize and
+        # throw away a perfectly good audio recording.
+        cfg = self.cfg
+        if not self._has_video and cfg.record_screen:
+            LOG.warning("No video was captured; saving audio only")
+            cfg = replace(cfg, record_screen=False)
+        cmd = build_finalize_cmd(cfg, listfile, dest, audio_roles(cfg), duration)
         LOG.info("Finalizing %d segment(s) -> %s", len(parts), dest.name)
         LOG.debug("finalize cmd: %s", " ".join(cmd))
         self._fin_proc = subprocess.Popen(

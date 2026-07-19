@@ -4,7 +4,7 @@
 system audio. Stops automatically when the call ends.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20X11-blue)
+![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20X11%20%7C%20Wayland-blue)
 ![Version](https://img.shields.io/badge/version-0.1.2-green)
 
 No more remembering to hit record. The app sits in the background, notices when a call starts, and
@@ -27,19 +27,20 @@ recording stops on its own and the file is saved as `Zoom_2026-07-17_14-30-05.mk
 
 | | |
 |---|---|
-| **Session** | **X11 only.** Screen capture uses `x11grab`. **Wayland is not supported yet.** |
+| **Session** | X11 or Wayland. X11 captures with `x11grab`; Wayland uses the xdg-desktop-portal ScreenCast API. |
 | OS | Debian/Ubuntu (built and tested on Ubuntu 24.04) |
 | Desktop | GNOME (tray icon needs the AppIndicator extension, shipped by default on Ubuntu) |
 | Audio | PipeWire or PulseAudio |
 
-Ubuntu 24.04 defaults to **Wayland**. Check your session:
+Both session types work, and the right capture backend is picked automatically:
 
 ```bash
-echo $XDG_SESSION_TYPE     # must print: x11
+echo $XDG_SESSION_TYPE     # x11 or wayland
 ```
 
-If it prints `wayland`, log out and pick **"Ubuntu on Xorg"** from the gear menu on the login
-screen. Wayland support is on the roadmap — see [Known limitations](#known-limitations).
+On **Wayland** the compositor — not the app — owns the screen, so the first recording asks you to
+approve screen sharing through your desktop's own dialog. That choice is remembered, so later
+recordings stay one click. See [Known limitations](#known-limitations) for the Wayland caveats.
 
 ## Install
 
@@ -200,8 +201,15 @@ journalctl --user -u meeting-recorder -f
 ```
 If your app isn't matched, add it to the `allowlist`.
 
-**Black screen / no video** — you're probably on Wayland. Run `echo $XDG_SESSION_TYPE`; it must say
-`x11`. Log in with "Ubuntu on Xorg".
+**Black screen / no video on Wayland** — screen sharing was probably denied, in which case the
+recording keeps the audio and drops the video. Clear the stored permission and you'll be asked
+again on the next recording:
+```bash
+meeting-recorder config     # then set "wayland_restore_token" back to ""
+```
+Check `gst-inspect-1.0 pipewiresrc` prints a plugin — without `gstreamer1.0-pipewire` installed,
+Wayland capture cannot work. To force a backend while debugging:
+`MEETING_RECORDER_CAPTURE=portal|x11 meeting-recorder run`.
 
 **No tray icon** — the GNOME AppIndicator extension must be enabled:
 ```bash
@@ -232,6 +240,8 @@ Your recordings in `~/Videos/MeetingRecorder/` are never touched.
 git clone https://github.com/ssKazal/meeting-recorder.git && cd meeting-recorder
 sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-notify-0.7 \
                  gir1.2-appindicator3-0.1 ffmpeg pulseaudio-utils \
+                 xdg-desktop-portal gstreamer1.0-pipewire gstreamer1.0-tools \
+                 gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
                  x11-utils x11-xserver-utils
 
 python3 -m meeting_recorder run     # run from source
@@ -245,7 +255,11 @@ during live capture*).
 
 ## Known limitations
 
-- **Wayland is not supported** — X11 only for now (`x11grab`). Wayland needs the PipeWire portal.
+- **Wayland asks permission once** — the portal dialog appears on the first recording; the answer is
+  remembered in `wayland_restore_token`. Denying it records audio only.
+- **On Wayland the control pill is placed by the compositor** — Wayland clients cannot position their
+  own windows, so it may not sit in the top-right corner. The tray icon is unaffected.
+- **Drag-to-select a region needs X11** (`slop`); on Wayland type the region into settings instead.
 - **Window/region capture is a fixed rectangle** — moving the window mid-call won't move the capture.
 - **Audio is processed at save time**, so volume/normalization changes apply to new recordings only.
   A 1-hour meeting takes a few minutes to finalize in the background.

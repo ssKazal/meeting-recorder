@@ -23,6 +23,8 @@ override_dh_auto_install:
 	    $(PKGDIR)/usr/lib/systemd/user/meeting-recorder.service
 	install -D -m 644 packaging/meeting-recorder-settings.desktop \
 	    $(PKGDIR)/usr/share/applications/meeting-recorder-settings.desktop
+	install -D -m 644 packaging/meeting-recorder.desktop \
+	    $(PKGDIR)/usr/share/applications/meeting-recorder.desktop
 	install -D -m 644 packaging/meeting-recorder.svg \
 	    $(PKGDIR)/usr/share/icons/hicolor/scalable/apps/meeting-recorder.svg
 

@@ -37,6 +37,7 @@ class Config:
     record_screen: bool
     capture_mode: str           # "fullscreen" | "window" | "area"
     capture_region: str         # "x,y,w,h" used when capture_mode == "area"
+    wayland_restore_token: str  # portal ScreenCast token, so we prompt only once
     record_mic: bool
     record_system_audio: bool
     mic_volume: float
@@ -65,6 +66,7 @@ class Config:
             record_screen=bool(data["record_screen"]),
             capture_mode=str(data.get("capture_mode", "fullscreen")),
             capture_region=str(data.get("capture_region", "")),
+            wayland_restore_token=str(data.get("wayland_restore_token", "")),
             record_mic=bool(data["record_mic"]),
             record_system_audio=bool(data["record_system_audio"]),
             mic_volume=float(data.get("mic_volume", 1.0)),
@@ -143,3 +145,20 @@ def save_user_config(data: dict[str, Any]) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return dest
+
+
+def save_restore_token(token: str) -> None:
+    """Persist the Wayland ScreenCast restore token, if it changed.
+
+    Stored in the user config so the portal picker only appears the first time.
+    Best-effort: failing to save just means the user gets asked again.
+    """
+    try:
+        data = load_raw_config()
+        if data.get("wayland_restore_token") == token:
+            return
+        data["wayland_restore_token"] = token
+        save_user_config(data)
+        LOG.info("Saved screen-capture permission for future recordings")
+    except OSError as exc:
+        LOG.warning("Could not save ScreenCast restore token: %s", exc)

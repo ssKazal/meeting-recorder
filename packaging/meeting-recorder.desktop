@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=Smart Meeting Recorder
+GenericName=Meeting Recorder
+Comment=Automatically record online meetings and calls
+Exec=meeting-recorder run
+Icon=meeting-recorder
+Terminal=false
+Categories=AudioVideo;Recorder;
+Keywords=meeting;record;screen;zoom;teams;meet;
+# Hidden from the app grid: this is the background daemon, not something to
+# launch by hand (the user-facing entry is meeting-recorder-settings.desktop).
+# It exists so the desktop can identify the daemon by name — the ScreenCast
+# portal resolves the requesting app from its systemd unit to this file, and
+# without it the "share your screen" dialog names whatever process happened to
+# start the daemon (e.g. the terminal or IDE it was launched from).
+NoDisplay=true
+StartupNotify=false

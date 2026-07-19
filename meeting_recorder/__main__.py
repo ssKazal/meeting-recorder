@@ -66,34 +66,59 @@ def _cmd_run(cfg) -> int:
     LOG.info("Smart Meeting Recorder %s running (polling every %.1fs). "
              "Watching for: %s", __version__, cfg.poll_interval_seconds,
              ", ".join(sorted({e.app for e in cfg.allowlist})))
-    notifier.info("Meeting Recorder active",
-                  "Watching for meetings in the background.")
     loop.run()
     return 0
 
 
 def _cmd_record(cfg) -> int:
-    """Record immediately until Ctrl-C — useful for testing capture end-to-end."""
+    """Record immediately until Ctrl-C — useful for testing capture end-to-end.
+
+    Driven by the same Controller the daemon uses, so a manual recording gets
+    the tray icon, live timer and pause/resume controls (and, on Wayland, the
+    ScreenCast handshake) instead of a second, poorer copy of that logic.
+    """
+    import gi
+    gi.require_version("GLib", "2.0")
+    from gi.repository import GLib
+
+    from .controller import Controller, State
+    from .notifier import Notifier
     from .recorder import Recorder
 
+    notifier = Notifier()
     recorder = Recorder(cfg)
-    path = build_output_path(cfg.output_dir, "Manual", cfg.container)
-    recorder.start(path)
-    print(f"Recording to {path} — press Ctrl-C to stop.")
-    try:
-        signal.pause()
-    except KeyboardInterrupt:
-        pass
-    # stop() only *launches* finalize (concat + denoise + loudnorm) in the
-    # background and returns a bool; we must block until it finishes, otherwise
-    # the process exits and the finalize child is killed, leaving orphaned
-    # .partN segments and no final file.
-    if not recorder.stop():
-        print("No file saved.")
+    controller = Controller(cfg, notifier, recorder)
+    loop = GLib.MainLoop()
+    result: dict = {}
+
+    def _on_finished(path):
+        result["path"] = path
+        loop.quit()
+
+    # Fires however the recording ends: Ctrl-C, or Stop on the tray/pill.
+    controller.on_finished = _on_finished
+
+    def _stop(*_a):
+        # stop_manual() only *launches* finalize (concat + denoise + loudnorm);
+        # the loop keeps running until on_finished reports the saved file,
+        # otherwise exiting here would kill the finalize child and leave
+        # orphaned .partN segments with no output.
+        print("\nStopping — finalizing (denoise + loudness normalize)…")
+        controller.stop_manual()
+        return False
+
+    GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGINT, _stop)
+    GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGTERM, _stop)
+
+    controller.start_manual("Manual")
+    if controller.state is not State.RECORDING:
+        print("Could not start recording.")
         return 1
-    print("Finalizing (denoise + loudness normalize)…")
-    saved = recorder.wait_finalize()
-    print(f"Saved: {saved}" if saved else "Finalize failed — no file saved.")
+    print("Recording — press Ctrl-C here, or use the tray icon, to stop.")
+    loop.run()
+
+    saved = result.get("path")
+    print(f"Saved: {saved}" if saved else "No file was saved.")
     return 0 if saved else 1
 
 

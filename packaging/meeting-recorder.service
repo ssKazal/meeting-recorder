@@ -8,8 +8,10 @@ PartOf=graphical-session.target
 Type=simple
 ExecStart=/usr/bin/meeting-recorder run
 Environment=PYTHONUNBUFFERED=1
-# Fallback X11 display for screen capture and notifications; the graphical
-# session normally imports the real DISPLAY/XAUTHORITY into the user manager.
+# Fallback X11 display for notifications and x11grab capture. The graphical
+# session normally imports the real DISPLAY/XAUTHORITY -- and, on Wayland,
+# WAYLAND_DISPLAY/XDG_SESSION_TYPE -- into the user manager, which is what
+# selects the capture backend. This is only a last resort for X11 sessions.
 Environment=DISPLAY=:0
 Restart=on-failure
 RestartSec=5
