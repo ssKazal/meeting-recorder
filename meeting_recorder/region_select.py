@@ -1,9 +1,14 @@
 """Drag-to-select a screen region with the mouse.
 
-Prefers the desktop's own area picker (`org.gnome.Shell.Screenshot.SelectArea`),
-which is the same selector GNOME's screenshot tool uses — so it looks exactly
-like the rest of the system and needs no styling from us. Only when that is
-unavailable (a non-GNOME desktop) do we draw our own overlay.
+Tries the desktop's own picker first (`org.gnome.Shell.Screenshot.SelectArea`),
+but do not expect it: GNOME 46 answers "SelectArea is not allowed" to anything
+that is not its own screenshot tool, so in practice the overlay below is what
+runs. The call is kept because other desktops (and older GNOME) do permit it,
+and their native picker is always the better match for the system.
+
+The overlay therefore has to look right on its own: it dims the screen, punches
+the selection out so the real screen shows through it, outlines it in the
+theme's selection colour and shows a live pixel readout.
 
 Neither path uses `slop`, which was X11-only and left Wayland users typing
 coordinates by hand.
@@ -72,6 +77,10 @@ class _RegionOverlay(Gtk.Window):
         self._can_dim = visual is not None and screen.is_composited()
         if visual is not None:
             self.set_visual(visual)
+        css = Gtk.CssProvider()
+        css.load_from_data(b"window { background-color: transparent; }")
+        self.get_style_context().add_provider(
+            css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.fullscreen()
 
         self.add_events(Gdk.EventMask.BUTTON_PRESS_MASK
@@ -107,7 +116,7 @@ class _RegionOverlay(Gtk.Window):
         rect = self._rect()
         if rect is None:
             self._draw_hint(cr, width, height)
-            return False
+            return True
 
         x, y, w, h = rect
         if self._can_dim:
@@ -126,7 +135,10 @@ class _RegionOverlay(Gtk.Window):
         cr.stroke()
 
         self._draw_size(cr, x, y, w, h, width)
-        return False
+        # True stops the default handler, which would otherwise paint the
+        # window's opaque theme background straight over everything above —
+        # that, not the cairo operators, is what made the overlay solid black.
+        return True
 
     def _draw_size(self, cr, x, y, w, h, screen_width) -> None:
         label = f"{int(w)} × {int(h)}"
