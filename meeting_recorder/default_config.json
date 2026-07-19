@@ -3,6 +3,7 @@
   "record_screen": true,
   "capture_mode": "fullscreen",
   "capture_region": "",
+  "show_cursor": true,
   "wayland_restore_token": "",
   "record_mic": true,
   "record_system_audio": true,

@@ -132,13 +132,16 @@ class Controller:
         return use_portal_capture()
 
     def _open_portal(self) -> None:
-        from .screencast import ScreenCastSession, source_types_for
+        from .screencast import (CURSOR_EMBEDDED, CURSOR_HIDDEN,
+                                 ScreenCastSession, source_types_for)
         # No "preparing" notification: the portal puts its own dialog on screen,
         # which is a clearer prompt than anything we could add next to it.
         self._session = ScreenCastSession()
         self._session.open(source_types_for(self.cfg.capture_mode),
                            self.cfg.wayland_restore_token,
-                           self._on_portal_ready, self._on_portal_error)
+                           self._on_portal_ready, self._on_portal_error,
+                           cursor_mode=(CURSOR_EMBEDDED if self.cfg.show_cursor
+                                        else CURSOR_HIDDEN))
 
     def _on_portal_ready(self, session) -> None:
         if self.state is not State.RECORDING or self._pending_path is None:

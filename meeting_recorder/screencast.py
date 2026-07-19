@@ -45,6 +45,7 @@ _REQUEST_IFACE = "org.freedesktop.portal.Request"
 # ScreenCast source types (bitmask) and cursor modes, per the portal spec.
 SOURCE_MONITOR = 1
 SOURCE_WINDOW = 2
+CURSOR_HIDDEN = 1    # compositor leaves the pointer out of the stream
 CURSOR_EMBEDDED = 2  # draw the pointer into the frames, like x11grab does
 PERSIST_UNTIL_REVOKED = 2
 
@@ -104,6 +105,7 @@ class ScreenCastSession:
         self._on_error: Callable[[str], None] | None = None
         self._source_types: int = SOURCE_MONITOR
         self._requested_token: str = ""
+        self._cursor_mode: int = CURSOR_EMBEDDED
         self._timeout_id: int | None = None
 
     @property
@@ -113,15 +115,19 @@ class ScreenCastSession:
     # -- handshake ---------------------------------------------------------
     def open(self, source_types: int, restore_token: str,
              on_ready: Callable[["ScreenCastSession"], None],
-             on_error: Callable[[str], None]) -> None:
+             on_error: Callable[[str], None],
+             cursor_mode: int = CURSOR_EMBEDDED) -> None:
         """Start the async CreateSession -> SelectSources -> Start handshake.
 
         Exactly one of `on_ready` / `on_error` is called, from the GLib loop.
+        Unlike X11, the pointer cannot be added or removed after the fact here:
+        the compositor decides, so `cursor_mode` has to be set up front.
         """
         self._on_ready = on_ready
         self._on_error = on_error
         self._source_types = source_types
         self._requested_token = restore_token
+        self._cursor_mode = cursor_mode
         try:
             Gio, GLib = _dbus()
             self._bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -195,7 +201,7 @@ class ScreenCastSession:
         options = {
             "types": GLib.Variant("u", self._source_types),
             "multiple": GLib.Variant("b", False),
-            "cursor_mode": GLib.Variant("u", CURSOR_EMBEDDED),
+            "cursor_mode": GLib.Variant("u", self._cursor_mode),
             "persist_mode": GLib.Variant("u", PERSIST_UNTIL_REVOKED),
         }
         if self._requested_token:

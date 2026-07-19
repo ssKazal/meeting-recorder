@@ -97,6 +97,9 @@ class SettingsWindow(Gtk.Window):
         region_box.pack_start(self.select_btn, False, False, 0)
         self._field(grid, "Region", region_box)
 
+        self.cursor_switch = self._switch(True)
+        self._field(grid, "Show mouse cursor", self.cursor_switch)
+
         self.mic_switch = self._switch(True)
         self._field(grid, "Microphone", self.mic_switch)
 
@@ -179,6 +182,7 @@ class SettingsWindow(Gtk.Window):
         self.capture_combo.set_active(
             next((i for i, (v, _l) in enumerate(CAPTURE_MODES) if v == mode), 0))
         self.region_entry.set_text(d.get("capture_region", ""))
+        self.cursor_switch.set_active(bool(d.get("show_cursor", True)))
         self.mic_switch.set_active(bool(d.get("record_mic", True)))
         self.sys_switch.set_active(bool(d.get("record_system_audio", True)))
         self.noise_switch.set_active(bool(d.get("noise_cancellation", True)))
@@ -320,6 +324,7 @@ class SettingsWindow(Gtk.Window):
             "record_screen": self.screen_switch.get_active(),
             "capture_mode": CAPTURE_MODES[max(0, self.capture_combo.get_active())][0],
             "capture_region": self.region_entry.get_text().strip(),
+            "show_cursor": self.cursor_switch.get_active(),
             "record_mic": self.mic_switch.get_active(),
             "record_system_audio": self.sys_switch.get_active(),
             "noise_cancellation": self.noise_switch.get_active(),

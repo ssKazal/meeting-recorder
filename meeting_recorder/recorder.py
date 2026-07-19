@@ -225,6 +225,7 @@ def build_ffmpeg_cmd(cfg: Config, output_path: Path, dev: CaptureDevices) -> lis
                           "-i", dev.video_fifo]
         else:
             cmd += tqs + ["-f", "x11grab", "-framerate", str(cfg.framerate),
+                          "-draw_mouse", "1" if cfg.show_cursor else "0",
                           "-video_size", dev.video_size,
                           "-i", f"{dev.display}+{dev.video_x},{dev.video_y}"]
         next_index += 1  # video occupies input 0

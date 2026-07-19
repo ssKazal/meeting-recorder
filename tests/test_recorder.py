@@ -66,6 +66,26 @@ def test_capture_fullscreen_offset_and_area_offset():
     assert "-video_size 800x600" in joined and "-i :0+100,50" in joined
 
 
+def test_capture_cursor_visibility_on_x11():
+    """x11grab draws the pointer by default; -draw_mouse 0 is what hides it."""
+    on = " ".join(build_ffmpeg_cmd(_cfg(record_screen=True, show_cursor=True), OUT, DEV))
+    off = " ".join(build_ffmpeg_cmd(_cfg(record_screen=True, show_cursor=False), OUT, DEV))
+    assert "-draw_mouse 1" in on
+    assert "-draw_mouse 0" in off
+
+
+def test_capture_cursor_is_not_an_ffmpeg_flag_on_wayland():
+    """On Wayland the compositor owns the pointer, not ffmpeg.
+
+    The portal decides via cursor_mode at SelectSources time, so -draw_mouse
+    must not appear on the rawvideo input — it would be meaningless there.
+    """
+    for visible in (True, False):
+        joined = " ".join(build_ffmpeg_cmd(
+            _cfg(record_screen=True, show_cursor=visible), OUT, _wayland_dev()))
+        assert "-draw_mouse" not in joined
+
+
 def test_capture_screen_only_has_no_audio():
     cmd = build_ffmpeg_cmd(
         _cfg(record_screen=True, record_mic=False, record_system_audio=False), OUT, DEV)

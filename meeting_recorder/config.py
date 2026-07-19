@@ -37,6 +37,7 @@ class Config:
     record_screen: bool
     capture_mode: str           # "fullscreen" | "window" | "area"
     capture_region: str         # "x,y,w,h" used when capture_mode == "area"
+    show_cursor: bool           # draw the mouse pointer into the video
     wayland_restore_token: str  # portal ScreenCast token, so we prompt only once
     record_mic: bool
     record_system_audio: bool
@@ -66,6 +67,7 @@ class Config:
             record_screen=bool(data["record_screen"]),
             capture_mode=str(data.get("capture_mode", "fullscreen")),
             capture_region=str(data.get("capture_region", "")),
+            show_cursor=bool(data.get("show_cursor", True)),
             wayland_restore_token=str(data.get("wayland_restore_token", "")),
             record_mic=bool(data["record_mic"]),
             record_system_audio=bool(data["record_system_audio"]),
