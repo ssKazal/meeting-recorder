@@ -28,7 +28,6 @@ Depends: ${misc:Depends},
 Recommends: gnome-shell-extension-appindicator,
             x11-utils,
             x11-xserver-utils
-Suggests: slop
 Description: Automatic meeting recorder for Linux desktops
  Smart Meeting Recorder runs quietly in the background and notices when you join
  an online meeting or voice call - Zoom, Google Meet, Microsoft Teams, Discord,

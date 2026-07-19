@@ -73,12 +73,9 @@ systemctl --user start meeting-recorder
 ```
 
 <details>
-<summary>Optional: better noise cancellation, and region drag-select</summary>
+<summary>Optional: better noise cancellation</summary>
 
 ```bash
-# Drag-select a screen region in Settings
-sudo apt install slop
-
 # Studio-grade mic denoising (RNNoise). Then set
 # "noise_model_path": "~/.local/share/meeting-recorder/std.rnnn" in your config.
 mkdir -p ~/.local/share/meeting-recorder
@@ -259,7 +256,6 @@ during live capture*).
   remembered in `wayland_restore_token`. Denying it records audio only.
 - **On Wayland the control pill is placed by the compositor** — Wayland clients cannot position their
   own windows, so it may not sit in the top-right corner. The tray icon is unaffected.
-- **Drag-to-select a region needs X11** (`slop`); on Wayland type the region into settings instead.
 - **Window/region capture is a fixed rectangle** — moving the window mid-call won't move the capture.
 - **Audio is processed at save time**, so volume/normalization changes apply to new recordings only.
   A 1-hour meeting takes a few minutes to finalize in the background.

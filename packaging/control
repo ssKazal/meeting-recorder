@@ -19,7 +19,6 @@ Depends: python3 (>= 3.10),
 Recommends: gnome-shell-extension-appindicator,
             x11-utils,
             x11-xserver-utils
-Suggests: slop
 Homepage: HOMEPAGE_PLACEHOLDER
 Description: Automatic meeting recorder for Linux desktops
  Smart Meeting Recorder runs quietly in the background and notices when you join

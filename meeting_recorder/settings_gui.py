@@ -84,11 +84,9 @@ class SettingsWindow(Gtk.Window):
         self.capture_combo.connect("changed", self._on_capture_mode_changed)
         self._field(grid, "Capture area", self.capture_combo)
 
-        # Region row, only sensitive for "Selected area". Drag-select needs
-        # `slop`, which is X11-only, so on Wayland the button stays disabled and
-        # the region has to be typed. Note the portal also asks which screen or
-        # window to share on Wayland, so this narrows that further rather than
-        # replacing it.
+        # Region row, only sensitive for "Selected area". Drag-select uses our
+        # own GTK overlay (see region_select.py) rather than `slop`, so it works
+        # on Wayland as well as X11.
         region_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.region_entry = Gtk.Entry()
         self.region_entry.set_placeholder_text("x,y,w,h")
@@ -221,25 +219,26 @@ class SettingsWindow(Gtk.Window):
     def _on_capture_mode_changed(self, combo: Gtk.ComboBoxText) -> None:
         is_area = CAPTURE_MODES[max(0, combo.get_active())][0] == "area"
         self.region_entry.set_sensitive(is_area)
-        has_slop = shutil.which("slop") is not None
-        self.select_btn.set_sensitive(is_area and has_slop)
-        if is_area and not has_slop:
-            self.select_btn.set_tooltip_text(
-                "Drag-select needs 'slop' (X11 only) — type the region as x,y,w,h")
+        self.select_btn.set_sensitive(is_area)
+        self.select_btn.set_tooltip_text(
+            "Drag a rectangle on the screen to set the capture region")
 
     def _on_select_area(self, _btn: Gtk.Button) -> None:
-        """Use `slop` to drag-select a screen region, then fill the entry."""
-        if not shutil.which("slop"):
-            self.status.set_text("Install 'slop' (sudo apt install slop) to drag-select.")
-            return
+        """Drag-select a region on screen and fill in the entry."""
+        from .region_select import select_region
+
+        # Get out of the way: the overlay covers the screen, and the settings
+        # window would otherwise be part of what the user is selecting over.
+        self.hide()
         try:
-            out = subprocess.run(["slop", "-f", "%x,%y,%w,%h"],
-                                 capture_output=True, text=True, timeout=60)
-            region = out.stdout.strip()
-            if region:
-                self.region_entry.set_text(region)
-        except (subprocess.SubprocessError, FileNotFoundError) as exc:
-            LOG.warning("slop failed: %s", exc)
+            region = select_region()
+        finally:
+            self.show()
+            self.present()
+        if region:
+            self.region_entry.set_text(region)
+            self.status.set_markup(
+                f"<span foreground='#2e7d32'>Region set to {region}.</span>")
 
     @staticmethod
     def _volume_scale(value: float) -> Gtk.Scale:
@@ -304,11 +303,12 @@ class SettingsWindow(Gtk.Window):
 
     # -- save --------------------------------------------------------------
     def _save(self) -> None:
-        """Write the config, restart the daemon so it takes effect, and close.
+        """Write the config and restart the daemon so it takes effect.
 
         The restart is not optional: the daemon reads its config once at
         startup, so a saved-but-not-restarted setting silently does nothing.
-        The window stays open only if the restart fails, so the user finds out.
+        The window stays open afterwards — saving is often followed by "Record
+        now", and reopening the window for that is needless friction.
         """
         folder = self.output_chooser.get_filename()
         # self.data came from load_raw_config(), so keys this window does not
@@ -331,10 +331,11 @@ class SettingsWindow(Gtk.Window):
         path = save_user_config(self.data)
         LOG.info("Saved settings to %s", path)
         if _restart_service():
-            self.close()
+            self.status.set_markup(
+                "<span foreground='#2e7d32'>Saved and applied.</span>")
             return
         # Saved, but the running daemon still has the old values — say so
-        # instead of closing on a half-applied change.
+        # rather than implying the change took effect.
         self.status.set_markup(
             "<span foreground='#b26a00'>Saved, but the background service could "
             "not be restarted — run <tt>meeting-recorder restart</tt> to apply."

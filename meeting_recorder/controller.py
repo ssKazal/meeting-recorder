@@ -7,9 +7,9 @@ States: IDLE -> PROMPTING -> RECORDING -> IDLE.
 An ignored session is remembered so we don't re-prompt for the same call.
 
 Only two notifications are shown, deliberately: the Record/Ignore prompt, and
-the clickable "saved" result at the end (plus a failure notice, which would
-otherwise lose a recording silently). Progress and status are the tray icon's
-job — anything more is noise during a call.
+the "saved" result at the end (plus a failure notice, which would otherwise
+lose a recording silently). Progress and status are the tray icon's job —
+anything more is noise during a call.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import enum
 from .config import Config
 from .notifier import Notifier
 from .recorder import Recorder
-from .utils import LOG, build_output_path, open_folder
+from .utils import LOG, build_output_path
 
 
 class State(enum.Enum):
@@ -233,13 +233,11 @@ class Controller:
             self.notifier.info("Recording failed", "Could not finalize the file.",
                                persistent=True)
         else:
-            self.notifier.info(
-                "Recording saved", path.name,
-                icon="folder-videos",
-                on_click=lambda p=path: open_folder(p),
-                click_label="📁 Open Folder",
-                persistent=True,
-            )
+            # No open-folder action: finishing a call should not put a file
+            # manager in front of whatever the user does next. The tray menu's
+            # "Open recordings folder" is there when they actually want it.
+            self.notifier.info("Recording saved", path.name,
+                               icon="folder-videos", persistent=True)
         self._run_complete(path)
 
     # -- recording controls (tray icon, or floating pill fallback) ---------
