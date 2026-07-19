@@ -4,6 +4,23 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.4] — 2026-07-19
+
+### Fixed
+- **"Open Folder" did nothing after a manual recording.** The problem was
+  lifetime, not wiring: a notification's buttons are callbacks into the process
+  that posted them, and `record` printed the saved path and exited immediately,
+  leaving a button with nothing behind it. Recordings started by the detector
+  were unaffected, because the daemon keeps running — which is why this looked
+  inconsistent. `record` now stays alive until the notification is dismissed or
+  acted on, capped at three minutes; the file is already written by then.
+  A Ctrl-C during that wait exits at once.
+
+### Changed
+- The tray menu drops "Open recordings folder" and "Settings…". It is for
+  controlling the recording in front of you, not a launcher; what remains is
+  the live timer, Pause/Resume and Stop & Save.
+
 ## [0.3.3] — 2026-07-19
 
 ### Fixed
@@ -281,6 +298,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.3.4]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.4
 [0.3.3]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.3
 [0.3.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.1

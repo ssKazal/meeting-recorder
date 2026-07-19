@@ -1,3 +1,12 @@
+meeting-recorder (0.3.4) noble; urgency=medium
+
+  * Fix "Open Folder" doing nothing after a manual recording: the notification's
+    button calls back into the process that posted it, and `record` had already
+    exited. It now waits for the notification before quitting.
+  * Drop "Open recordings folder" and "Settings..." from the tray menu.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Sun, 19 Jul 2026 16:52:00 +0600
+
 meeting-recorder (0.3.3) noble; urgency=medium
 
   * Fix selected-area recordings shearing into diagonal colour smears: the
