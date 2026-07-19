@@ -4,6 +4,31 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] — 2026-07-19
+
+### Changed
+- **Settings that 0.3.0 trimmed too aggressively are back**: file format
+  (mkv/mp4), microphone and system-audio volume, and the capture area
+  (full screen / current window / selected area) with its `x,y,w,h` region.
+  Drag-select still needs `slop`, which is X11-only, so on Wayland the button is
+  disabled with a tooltip and the region is typed instead.
+- **`stop_debounce_seconds` now defaults to 3s** rather than the 60s introduced
+  in 0.3.0, and the spinner steps by 1s. 60s left the recorder visibly running
+  for a minute after every call. The consequence is unchanged: because muting
+  releases the microphone, this delay is also the longest mute that will not end
+  a recording, so raise it if you mute for long stretches.
+
+### Fixed
+- The settings window's action buttons sat in two stacked rows, so "Record now"
+  and "Reset to defaults" did not share a baseline with "Cancel" and "Save".
+  They are now one row.
+- The APT repository stopped updating after v0.2.1. It publishes on
+  `release: published`, but GitHub suppresses workflow-triggering events for
+  anything created with the default `GITHUB_TOKEN` — so once releases were
+  published by CI rather than by hand, `apt install meeting-recorder` silently
+  kept serving 0.2.1 while newer releases sat on the releases page. The release
+  workflow now calls the APT publish directly.
+
 ## [0.3.0] — 2026-07-19
 
 ### Added
@@ -194,6 +219,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.3.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.0
 [0.2.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.1
