@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Wayland support
-    url: https://github.com/ssKazal/meeting-recorder/issues
-    about: "Screen capture is X11-only for now. Check `echo $XDG_SESSION_TYPE` — if it prints `wayland`, log in with \"Ubuntu on Xorg\". Please comment on the existing Wayland issue rather than opening a new one."
   - name: Questions and ideas
     url: https://github.com/ssKazal/meeting-recorder/discussions
     about: Ask a question or discuss an idea before filing an issue.

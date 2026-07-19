@@ -23,10 +23,11 @@ body:
   - type: markdown
     attributes:
       value: |
-        > ⚠️ **If you selected `wayland`:** screen capture is not supported yet —
-        > this release uses `x11grab`. Log out and choose **"Ubuntu on Xorg"** at
-        > the login screen. Please don't open a new issue for this; comment on the
-        > Wayland support issue instead.
+        > **On `wayland`:** capture goes through the `xdg-desktop-portal`
+        > ScreenCast API, so the desktop must grant screen sharing. If the video
+        > is missing or black, please include the output of
+        > `journalctl --user -u meeting-recorder` — a denied or crashing portal
+        > makes the recorder fall back to audio-only.
 
   - type: input
     id: version

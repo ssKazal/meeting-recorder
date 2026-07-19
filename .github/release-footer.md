@@ -13,7 +13,7 @@ meeting-recorder start
 
 ### ⚠️ Requirements
 
-- **X11 only.** Screen capture uses `x11grab`; **Wayland is not supported yet**. Ubuntu 24.04 defaults to Wayland — check your session with `echo $XDG_SESSION_TYPE` (it must print `x11`). If it prints `wayland`, log out and pick **"Ubuntu on Xorg"** from the gear menu on the login screen.
+- **X11 and Wayland.** The backend is chosen automatically: X11 captures with `x11grab`, Wayland through the `xdg-desktop-portal` ScreenCast API. On Wayland your desktop asks permission to share the screen the first time — the choice is remembered, so recording stays one click.
 - Debian/Ubuntu (built and tested on Ubuntu 24.04), GNOME, PipeWire or PulseAudio.
 
 **Full documentation:** [README](https://github.com/ssKazal/meeting-recorder#readme) · **Changelog:** [CHANGELOG.md](https://github.com/ssKazal/meeting-recorder/blob/main/CHANGELOG.md)
