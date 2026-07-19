@@ -35,14 +35,42 @@ def sanitize_app_name(name: str) -> str:
     return token or "Meeting"
 
 
-def open_folder(path: Path) -> None:
-    """Open the folder containing `path` in the file manager.
+def _show_in_file_manager(target: Path) -> bool:
+    """Ask the file manager to reveal `target` over D-Bus. True if it accepted.
 
-    Selects the file itself when the file manager supports it (Nautilus),
-    otherwise just opens the containing directory.
+    Preferred over spawning `nautilus --select`, which does nothing visible
+    when a window for that folder is already open: it neither re-selects the
+    file nor raises the window, and on Wayland a client cannot raise itself at
+    all without an activation token. FileManager1 is the freedesktop interface
+    for exactly this, and the file manager does the focusing itself.
+    """
+    try:
+        import gi
+        from gi.repository import Gio, GLib
+
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        bus.call_sync(
+            "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
+            "org.freedesktop.FileManager1", "ShowItems",
+            GLib.Variant("(ass)", ([target.absolute().as_uri()], "")),
+            None, Gio.DBusCallFlags.NONE, 5000, None)
+        return True
+    except Exception as exc:  # no gi, no session bus, no file manager
+        LOG.debug("FileManager1 unavailable (%s); falling back", exc)
+        return False
+
+
+def open_folder(path: Path) -> None:
+    """Reveal `path` in the file manager, raising an already-open window.
+
+    Selects the file itself where possible, otherwise opens the containing
+    directory.
     """
     p = Path(path)
     folder = p.parent if p.suffix else p
+    if p.exists() and _show_in_file_manager(p):
+        return
+    # Fallbacks: a file manager without FileManager1, or no D-Bus at all.
     if p.is_file() and shutil.which("nautilus"):
         cmd = ["nautilus", "--select", str(p)]
     else:
