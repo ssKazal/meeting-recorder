@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] — 2026-07-19
+
+### Fixed
+- **The tray icon never appeared in the GNOME panel.** The indicator asked for
+  `media-record`, which the Yaru theme does not ship — it has only
+  `media-record-symbolic`. GTK still resolved the name through the legacy
+  Humanity theme, so it looked correct to every local check, but the panel is
+  drawn by gnome-shell, which resolves against its own theme, found nothing and
+  drew an invisible icon. It now prefers the symbolic names (present in Yaru and
+  Adwaita) and falls back to the bundled `meeting-recorder` icon in hicolor.
+- The release footer, issue templates and apt landing page still said Wayland
+  was unsupported and told users to log in with "Ubuntu on Xorg". The footer is
+  appended to every GitHub release, so the 0.2.0 notes contradicted the release
+  they were describing.
+
 ## [0.2.0] — 2026-07-19
 
 ### Added
@@ -129,6 +144,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.2.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.0
 [0.1.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.1
