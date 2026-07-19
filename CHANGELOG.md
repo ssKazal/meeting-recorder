@@ -4,6 +4,28 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.5] — 2026-07-19
+
+### Fixed
+- **The tray icon was replaced by the floating pill in the top-right corner.**
+  0.3.4 removed an argument from `RecordingTray` but left the controller still
+  passing it, so building the tray raised `TypeError` every time and the
+  controller quietly fell back to the pill. The fallback logged at debug level,
+  so a completely broken tray degraded in silence; it now logs a warning with a
+  traceback, and a headless test checks that the controller only passes
+  arguments the tray actually accepts.
+- **The region overlay still painted the screen solid black.** 0.3.3 fixed the
+  cairo operators, but the draw handler returned `False`, which in GTK3 lets the
+  default handler paint the window's opaque background straight over it. It now
+  returns `True` and the window carries a transparent CSS background. Selecting
+  an area shows a dimmed screen with the selection punched through it, outlined
+  in the theme's colour with a live pixel readout.
+
+### Changed
+- GNOME 46 refuses `org.gnome.Shell.Screenshot.SelectArea` to anything but its
+  own screenshot tool, so the built-in overlay — not the desktop's picker — is
+  what runs on GNOME. The call is kept for desktops that do allow it.
+
 ## [0.3.4] — 2026-07-19
 
 ### Fixed
@@ -298,6 +320,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.3.5]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.5
 [0.3.4]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.4
 [0.3.3]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.3
 [0.3.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.2

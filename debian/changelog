@@ -1,3 +1,13 @@
+meeting-recorder (0.3.5) noble; urgency=medium
+
+  * Fix the tray icon being replaced by the floating pill: the controller was
+    passing an argument RecordingTray no longer accepted, and the failure was
+    swallowed at debug level.
+  * Fix the region-selection overlay painting the screen solid black; the draw
+    handler let GTK paint its opaque background over the dimmed layer.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Sun, 19 Jul 2026 17:04:00 +0600
+
 meeting-recorder (0.3.4) noble; urgency=medium
 
   * Fix "Open Folder" doing nothing after a manual recording: the notification's
