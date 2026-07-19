@@ -4,6 +4,29 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.2] — 2026-07-19
+
+### Added
+- **Show or hide the mouse cursor** in the recording. The two backends handle
+  this differently: on X11 it is ffmpeg's `-draw_mouse`, while on Wayland the
+  compositor composites the pointer, so it is the portal's cursor mode and has
+  to be chosen before the stream starts.
+- **Drag-select the capture region with the mouse.** This used to shell out to
+  `slop`, which is X11-only, so on Wayland the button was permanently disabled
+  and the region had to be typed as `x,y,w,h`. It now draws its own full-screen
+  overlay — dimmed background, the selection punched out of it, a live pixel
+  readout, Escape to cancel — so it works on both session types. `slop` is no
+  longer suggested by the package. The result is offset by the monitor origin,
+  so regions are correct on a multi-monitor desktop.
+
+### Changed
+- Saving in the settings window no longer closes it: changing a setting and
+  then pressing "Record now" is a normal thing to want. Save still applies
+  immediately and reports it in place.
+- The "Recording saved" notification no longer offers to open the folder, so
+  finishing a call does not put a file manager in front of what you are doing.
+  The tray menu's "Open recordings folder" is unchanged.
+
 ## [0.3.1] — 2026-07-19
 
 ### Changed
@@ -219,6 +242,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.3.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.0
 [0.2.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.2

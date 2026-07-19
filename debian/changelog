@@ -1,3 +1,13 @@
+meeting-recorder (0.3.2) noble; urgency=medium
+
+  * Add an option to show or hide the mouse cursor in the recording.
+  * Drag-select the capture region with the mouse, using a built-in overlay
+    that works on Wayland as well as X11; drop the slop suggestion.
+  * Keep the settings window open after saving.
+  * Stop offering to open the output folder from the "saved" notification.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Sun, 19 Jul 2026 16:05:00 +0600
+
 meeting-recorder (0.3.1) noble; urgency=medium
 
   * Restore the file format, microphone/system volume and capture-area settings
