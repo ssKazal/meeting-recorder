@@ -4,7 +4,7 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] — 2026-07-19
 
 ### Added
 - **Wayland screen capture.** Sessions are detected automatically: X11 keeps using
@@ -129,6 +129,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.2.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.0
 [0.1.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.0

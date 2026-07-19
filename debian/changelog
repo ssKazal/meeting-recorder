@@ -1,3 +1,25 @@
+meeting-recorder (0.2.0) noble; urgency=medium
+
+  * Add Wayland screen capture via the xdg-desktop-portal ScreenCast API.
+    X11 sessions keep using x11grab; the backend is chosen automatically.
+    Because ffmpeg has no PipeWire input device, a gst-launch-1.0 pipewiresrc
+    pump feeds raw frames into the same ffmpeg process that records the audio,
+    so A/V stay on one clock and pause/resume is unchanged.
+  * The screen-sharing permission is requested once and remembered; denying it
+    (or an unresponsive portal) now records audio only instead of failing.
+  * Fix finalize discarding a whole recording when no video was captured: it
+    mapped a video stream that the segments did not contain.
+  * Fix `meeting-recorder record` having no tray icon, timer or pause/resume,
+    and show the controls as soon as Record is pressed rather than once capture
+    starts.
+  * Stop amplifying background noise: loudnorm ran after denoising and lifted
+    room tone with the voice. A gate now runs before it.
+  * Reduce notifications to the Record/Ignore prompt and the saved result.
+  * Depend on xdg-desktop-portal and the GStreamer PipeWire plugins; x11-utils
+    and x11-xserver-utils move to Recommends.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Sun, 19 Jul 2026 14:45:00 +0600
+
 meeting-recorder (0.1.2) noble; urgency=medium
 
   * Fix `meeting-recorder record` never producing a final file: the manual
