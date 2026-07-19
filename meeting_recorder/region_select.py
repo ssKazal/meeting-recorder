@@ -1,9 +1,12 @@
 """Drag-to-select a screen region with the mouse.
 
-Replaces the `slop` helper, which is X11-only: on Wayland the drag-select
-button was permanently disabled and the region had to be typed as x,y,w,h.
-This draws its own full-screen overlay with GTK, so the same code works on
-both session types and adds no packaging dependency.
+Prefers the desktop's own area picker (`org.gnome.Shell.Screenshot.SelectArea`),
+which is the same selector GNOME's screenshot tool uses — so it looks exactly
+like the rest of the system and needs no styling from us. Only when that is
+unavailable (a non-GNOME desktop) do we draw our own overlay.
+
+Neither path uses `slop`, which was X11-only and left Wayland users typing
+coordinates by hand.
 
 Usage:
 
@@ -12,22 +15,49 @@ Usage:
 
 from __future__ import annotations
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, Gtk  # noqa: E402
+# Gdk must be pinned too, not just Gtk: imported on its own (before anything
+# has pulled in Gtk 3), PyGObject would otherwise default to Gdk 4 and the
+# import fails with a version clash.
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from .utils import LOG  # noqa: E402
 
 _MIN_SIZE = 8  # px; below this a drag is almost certainly a stray click
+# The user has to drag before this returns, so it must outlast a moment's
+# hesitation — but not hang the settings window forever if the shell goes away.
+_PICKER_TIMEOUT_MS = 120_000
+
+
+def _gnome_select_area() -> tuple[int, int, int, int] | None:
+    """GNOME's built-in area picker. None if unavailable or cancelled."""
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        reply = bus.call_sync(
+            "org.gnome.Shell.Screenshot", "/org/gnome/Shell/Screenshot",
+            "org.gnome.Shell.Screenshot", "SelectArea", None,
+            GLib.VariantType("(iiii)"), Gio.DBusCallFlags.NONE,
+            _PICKER_TIMEOUT_MS, None)
+        x, y, w, h = reply.unpack()
+        return (x, y, w, h) if w > 0 and h > 0 else None
+    except GLib.Error as exc:
+        # Cancelling the picker also lands here, which is why this is not an
+        # error: both "no GNOME" and "user pressed Escape" mean "no region".
+        LOG.debug("GNOME SelectArea unavailable or cancelled: %s", exc.message)
+        return None
 
 
 class _RegionOverlay(Gtk.Window):
-    """A dim full-screen window that reports the rectangle you drag on it."""
+    """Fallback picker: a dimmed full-screen window you drag a rectangle on."""
 
     def __init__(self) -> None:
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
         self.region: tuple[int, int, int, int] | None = None
+        self.cancelled = False
         self._start: tuple[float, float] | None = None
         self._current: tuple[float, float] | None = None
 
@@ -35,10 +65,11 @@ class _RegionOverlay(Gtk.Window):
         self.set_decorated(False)
         self.set_keep_above(True)
         self.set_skip_taskbar_hint(True)
-        # Transparency needs an RGBA visual; without a compositor the overlay
-        # still works, it just paints opaque grey instead of dimming.
+        # Transparency needs an RGBA visual *and* compositing. Without one the
+        # overlay would paint solid, hiding the very screen being selected.
         screen = self.get_screen()
         visual = screen.get_rgba_visual()
+        self._can_dim = visual is not None and screen.is_composited()
         if visual is not None:
             self.set_visual(visual)
         self.fullscreen()
@@ -53,11 +84,25 @@ class _RegionOverlay(Gtk.Window):
         self.connect("button-release-event", self._on_release)
         self.connect("key-press-event", self._on_key)
 
+    def _accent(self) -> tuple[float, float, float]:
+        """The theme's selection colour, so the marquee matches the desktop."""
+        found, colour = self.get_style_context().lookup_color(
+            "theme_selected_bg_color")
+        if found:
+            return colour.red, colour.green, colour.blue
+        return 0.21, 0.52, 0.89
+
     # -- drawing -----------------------------------------------------------
     def _on_draw(self, _widget, cr) -> bool:
         width, height = self.get_size()
-        cr.set_source_rgba(0, 0, 0, 0.45)
+
+        # SOURCE, not the default OVER: this replaces the surface contents
+        # including its alpha. Compositing 45% black OVER GTK's opaque backing
+        # just yields black, which is what made the overlay a solid screen.
+        cr.set_operator(cairo.OPERATOR_SOURCE)
+        cr.set_source_rgba(0, 0, 0, 0.45 if self._can_dim else 1.0)
         cr.paint()
+        cr.set_operator(cairo.OPERATOR_OVER)
 
         rect = self._rect()
         if rect is None:
@@ -65,23 +110,31 @@ class _RegionOverlay(Gtk.Window):
             return False
 
         x, y, w, h = rect
-        # Punch the selection out of the dim layer so it shows true colours.
-        cr.set_operator(1)  # CLEAR
-        cr.rectangle(x, y, w, h)
-        cr.fill()
-        cr.set_operator(2)  # OVER
+        if self._can_dim:
+            # Punch the selection out of the dim layer so it shows the real
+            # screen underneath. CLEAR is 0 — the previous code passed 1, which
+            # is SOURCE, so nothing was ever cleared.
+            cr.set_operator(cairo.OPERATOR_CLEAR)
+            cr.rectangle(x, y, w, h)
+            cr.fill()
+            cr.set_operator(cairo.OPERATOR_OVER)
 
-        cr.set_source_rgba(0.90, 0.30, 0.24, 1.0)
+        r, g, b = self._accent()
+        cr.set_source_rgba(r, g, b, 1.0)
         cr.set_line_width(2)
         cr.rectangle(x + 1, y + 1, max(0, w - 2), max(0, h - 2))
         cr.stroke()
 
+        self._draw_size(cr, x, y, w, h, width)
+        return False
+
+    def _draw_size(self, cr, x, y, w, h, screen_width) -> None:
         label = f"{int(w)} × {int(h)}"
         cr.select_font_face("Sans")
         cr.set_font_size(14)
         ext = cr.text_extents(label)
-        # Keep the readout inside the screen when selecting near an edge.
-        tx = min(max(x, 4), width - ext.width - 12)
+        # Keep the readout on screen when selecting against an edge.
+        tx = min(max(x, 4), max(4, screen_width - ext.width - 12))
         ty = y - 8 if y > 24 else y + h + 20
         cr.set_source_rgba(0, 0, 0, 0.75)
         cr.rectangle(tx - 4, ty - ext.height - 4, ext.width + 10, ext.height + 10)
@@ -89,7 +142,6 @@ class _RegionOverlay(Gtk.Window):
         cr.set_source_rgba(1, 1, 1, 1)
         cr.move_to(tx, ty)
         cr.show_text(label)
-        return False
 
     def _draw_hint(self, cr, width: int, height: int) -> None:
         text = "Drag to select a region  ·  Esc to cancel"
@@ -132,20 +184,20 @@ class _RegionOverlay(Gtk.Window):
     def _on_key(self, _w, event) -> bool:
         if event.keyval == Gdk.KEY_Escape:
             self.region = None
+            self.cancelled = True
             self._finish()
         return True
 
     def _to_screen(self, rect: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
         """Offset a window-relative rect by the monitor's position.
 
-        Events are relative to this window; the capture geometry the recorder
-        needs is relative to the whole desktop, which differs on a multi-monitor
-        setup where a monitor does not start at 0,0.
+        Events are relative to this window; the recorder needs coordinates
+        relative to the whole desktop, which differ on a multi-monitor setup
+        where a monitor does not start at 0,0.
         """
         x, y, w, h = rect
         try:
-            gdk_window = self.get_window()
-            monitor = self.get_display().get_monitor_at_window(gdk_window)
+            monitor = self.get_display().get_monitor_at_window(self.get_window())
             geo = monitor.get_geometry()
             return x + geo.x, y + geo.y, w, h
         except Exception:  # pragma: no cover - best effort
@@ -157,23 +209,27 @@ class _RegionOverlay(Gtk.Window):
         Gtk.main_quit()
 
 
-def select_region() -> str | None:
-    """Show the overlay and return the dragged region as "x,y,w,h".
-
-    Returns None if the user pressed Escape or barely moved the mouse. Runs a
-    nested GTK loop, so it can be called from a handler inside another window.
-    """
+def _overlay_select_area() -> tuple[int, int, int, int] | None:
+    """Our own picker, for desktops without a native one."""
     try:
         overlay = _RegionOverlay()
         overlay.show_all()
-        # Grab focus so Escape reaches us rather than the window underneath.
         overlay.present()
-        Gtk.main()
+        Gtk.main()          # nested: callable from inside another window
+        region = overlay.region
         overlay.destroy()
+        return region
     except Exception as exc:  # pragma: no cover - no display
         LOG.warning("Region selection failed: %s", exc)
         return None
-    if overlay.region is None:
+
+
+def select_region() -> str | None:
+    """Pick a screen region and return it as "x,y,w,h" (None if cancelled)."""
+    region = _gnome_select_area()
+    if region is None:
+        region = _overlay_select_area()
+    if region is None:
         return None
-    x, y, w, h = overlay.region
+    x, y, w, h = region
     return f"{x},{y},{w},{h}"
