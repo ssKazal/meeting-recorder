@@ -1,3 +1,17 @@
+meeting-recorder (0.3.0) noble; urgency=medium
+
+  * Add a "Record now" button to the settings window for a manual recording,
+    and a confirmed "Reset to defaults".
+  * Simplify the settings window to the options that change the result; the
+    remaining keys stay editable in config.json.
+  * Collapse "Save" and "Save & Apply" into one Save that writes, restarts the
+    service and closes the window — saving without restarting left the new
+    settings inert.
+  * Default stop_debounce_seconds to 60s: muting yourself releases the mic and
+    used to end the recording. The extra wait is trimmed off the saved file.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Sun, 19 Jul 2026 15:30:00 +0600
+
 meeting-recorder (0.2.2) noble; urgency=medium
 
   * Fix the tray icon rendering white: gnome-shell recolours *-symbolic icons to

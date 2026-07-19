@@ -4,6 +4,36 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-07-19
+
+### Added
+- **Record now** button in the settings window: starts a recording immediately
+  without waiting for a meeting to be detected. It runs the `record` subcommand,
+  so it reuses the tray icon, timer, pause/resume and the Wayland portal
+  handshake rather than reimplementing capture.
+- **Reset to defaults** button, with a confirmation. Nothing is written until
+  Save, so it can still be backed out by closing the window.
+
+### Changed
+- **The settings window is now minimal.** It shows only what changes the result:
+  save folder, what to record (screen / microphone / system audio), noise
+  cancellation, auto-record, and how long to keep recording after a call ends.
+  Nothing was removed from the app — the daemon still reads every key, so file
+  format, frame rate, capture mode/region, the volume sliders, normalization and
+  the popup timeout remain editable in `~/.config/meeting-recorder/config.json`.
+  Capture region in particular was a fixed rectangle that did not follow the
+  window, and its drag-select needs `slop`, which is X11-only; on Wayland the
+  portal already asks which screen or window to share.
+- **"Save" and "Save & Apply" are now one "Save".** The daemon reads its config
+  once at startup, so saving without restarting left the new settings silently
+  inert. Save now writes, restarts the service and closes the window — staying
+  open only if the restart fails.
+- **`stop_debounce_seconds` now defaults to 60s** (was 5s). Apps release the
+  microphone while you are muted, which is indistinguishable from leaving the
+  call, so a short delay ended the recording the moment you muted yourself. The
+  extra wait is trimmed off the saved file, so the recording still ends where
+  the call did. The settings cap rose from 15s to 300s to match.
+
 ## [0.2.2] — 2026-07-19
 
 ### Fixed
@@ -164,6 +194,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.3.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.0
 [0.2.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.0
