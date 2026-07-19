@@ -1,5 +1,5 @@
 Package: meeting-recorder
-Version: 0.2.0
+Version: 0.2.1
 Architecture: all
 Maintainer: Md Salman Siddik Kazal  salmansiddik19@outlook.com
 Depends: python3 (>= 3.10),
@@ -18,11 +18,11 @@ Recommends: gnome-shell-extension-appindicator,
             x11-utils,
             x11-xserver-utils
 Suggests: slop
-Filename: pool/main/m/meeting-recorder/meeting-recorder_0.2.0_all.deb
-Size: 40922
-MD5sum: e23df94733a27eaabb8ec9d7adb728ea
-SHA1: dc72951a45faff6a2e277516a3c3557f6e46b0cf
-SHA256: 9b86c2ea76787cde199cc0dedd16faad9791e88b5c8045a13ce0b46dea797d60
+Filename: pool/main/m/meeting-recorder/meeting-recorder_0.2.1_all.deb
+Size: 41612
+MD5sum: de5ba2ecdea3a72d8de4c65320ab3b90
+SHA1: 2b1ff6e72bc554abee6f530f1d3e083972dad5a4
+SHA256: a29a88ec210d6fd12e880c24711c740236c912b6ec1f0b87c478dfbaba259e27
 Section: video
 Priority: optional
 Homepage: https://github.com/ssKazal/meeting-recorder
