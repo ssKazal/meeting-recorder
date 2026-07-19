@@ -26,8 +26,26 @@ from .recording_widget import _fmt  # noqa: E402  (shared MM:SS formatter)
 from .utils import LOG  # noqa: E402
 
 _ID = "meeting-recorder"
-_ICON_RECORDING = "media-record"
-_ICON_PAUSED = "media-playback-pause"
+# Symbolic names, and our own icon as the last resort. The panel is drawn by
+# gnome-shell, which resolves icons against the *shell's* theme (Yaru here) —
+# not GTK's search path. Yaru ships only `media-record-symbolic`, so the plain
+# `media-record` name resolved for GTK (via the legacy Humanity theme) while
+# the shell found nothing and drew an invisible icon. `meeting-recorder` lives
+# in hicolor, which every theme inherits.
+_ICON_RECORDING = ("media-record-symbolic", "meeting-recorder")
+_ICON_PAUSED = ("media-playback-pause-symbolic", "meeting-recorder")
+
+
+def _icon_name(candidates: tuple[str, ...]) -> str:
+    """First candidate the icon theme actually has, else our bundled icon."""
+    try:
+        theme = Gtk.IconTheme.get_default()
+        for name in candidates:
+            if theme.has_icon(name):
+                return name
+    except Exception:  # pragma: no cover - no theme (headless)
+        LOG.debug("icon theme lookup failed", exc_info=True)
+    return candidates[-1]
 
 
 class RecordingTray:
@@ -44,7 +62,8 @@ class RecordingTray:
         self.paused = False
 
         self.ind = AppIndicator3.Indicator.new(
-            _ID, _ICON_RECORDING, AppIndicator3.IndicatorCategory.APPLICATION_STATUS)
+            _ID, _icon_name(_ICON_RECORDING),
+            AppIndicator3.IndicatorCategory.APPLICATION_STATUS)
         self.ind.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
 
         self.menu = Gtk.Menu()
@@ -108,7 +127,7 @@ class RecordingTray:
     def _refresh(self) -> None:
         self.pause_item.set_label("Resume" if self.paused else "Pause")
         self.ind.set_icon_full(
-            _ICON_PAUSED if self.paused else _ICON_RECORDING,
+            _icon_name(_ICON_PAUSED if self.paused else _ICON_RECORDING),
             "Paused" if self.paused else "Recording")
 
     def _on_open_folder(self, _item: Gtk.MenuItem) -> None:
