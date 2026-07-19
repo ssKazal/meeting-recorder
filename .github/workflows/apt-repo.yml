@@ -11,6 +11,18 @@ name: APT repository
 #   GPG_PRIVATE_KEY  ASCII-armored private key used to sign the repo
 #   GPG_PASSPHRASE   passphrase for that key (may be empty)
 on:
+  # Called by release.yml right after it publishes. This is the path that
+  # actually runs: a release created by a workflow using the default
+  # GITHUB_TOKEN does NOT emit `release: published`, because GitHub suppresses
+  # events from that token to stop workflows triggering themselves. Relying on
+  # the release trigger alone left the apt repo two versions behind.
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. v0.1.1)"
+        required: true
+        type: string
+  # Kept for a release published by hand (or from the GitHub UI).
   release:
     types: [published]
   workflow_dispatch:

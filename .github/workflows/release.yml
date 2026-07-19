@@ -74,3 +74,14 @@ jobs:
           name: ${{ github.ref_name }}
           draft: false
           prerelease: false
+
+  # Publish the apt repo explicitly rather than waiting for `release: published`
+  # to trigger it: the release above is created with GITHUB_TOKEN, and GitHub
+  # does not emit workflow-triggering events for that token.
+  apt-repo:
+    name: Publish APT repository
+    needs: [release]
+    uses: ./.github/workflows/apt-repo.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit
