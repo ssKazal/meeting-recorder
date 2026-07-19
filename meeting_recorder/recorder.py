@@ -58,6 +58,19 @@ def _even(n: int) -> int:
     return n - (n % 2)
 
 
+def _packed_width(n: int) -> int:
+    """Round down to a width GStreamer emits without row padding.
+
+    GStreamer pads I420 rows to a 4-byte stride, but ffmpeg's rawvideo demuxer
+    assumes rows are tightly packed. When they disagree every row is offset by
+    a few bytes and the picture shears into diagonal colour smears. Luma needs
+    width % 4 == 0 and chroma needs (width / 2) % 4 == 0, so a multiple of 8
+    satisfies both. 1920 and 640 already do, which is why full-screen capture
+    looked fine while an arbitrary dragged region did not.
+    """
+    return n - (n % 8)
+
+
 def active_window_geometry() -> tuple[int, int, int, int] | None:
     """(x, y, w, h) of the currently focused window via xprop + xwininfo."""
     try:
@@ -90,6 +103,27 @@ def parse_region(text: str) -> tuple[int, int, int, int] | None:
     return None
 
 
+def clamp_region(geo: tuple[int, int, int, int],
+                 bounds: tuple[int, int]) -> tuple[int, int, int, int] | None:
+    """Trim a region to the screen, or None if it lies entirely outside it.
+
+    A region can extend past the edge — a drag that ran off-screen, a saved
+    region from a larger monitor, or a hand-typed one. Left unclamped it
+    silently produced the wrong picture rather than an error: x11grab is asked
+    to grab off-screen, and on Wayland videocrop yields a smaller rectangle
+    than the caps demand, so videoscale upscales it into a blurry stretch.
+    """
+    x, y, w, h = geo
+    max_w, max_h = bounds
+    x = max(0, min(x, max_w))
+    y = max(0, min(y, max_h))
+    w = min(w, max_w - x)
+    h = min(h, max_h - y)
+    if w <= 0 or h <= 0:
+        return None
+    return x, y, w, h
+
+
 def video_geometry(cfg: Config) -> tuple[int, int, str]:
     """Resolve (x_offset, y_offset, 'WxH') for the chosen capture_mode.
 
@@ -104,7 +138,16 @@ def video_geometry(cfg: Config) -> tuple[int, int, str]:
     elif cfg.capture_mode == "area":
         geo = parse_region(cfg.capture_region)
         if geo:
-            x, y, w, h = geo
+            size = screen_resolution()
+            bounds = tuple(int(p) for p in size.split("x"))
+            clamped = clamp_region(geo, bounds)
+            if clamped is None:
+                LOG.warning("capture_region %s is off-screen; using full screen",
+                            cfg.capture_region)
+                return 0, 0, size
+            if clamped != geo:
+                LOG.info("capture_region trimmed to the screen: %s", clamped)
+            x, y, w, h = clamped
             return x, y, f"{_even(w)}x{_even(h)}"
         LOG.warning("No valid capture_region; using full screen")
     return 0, 0, screen_resolution()
@@ -160,7 +203,11 @@ def build_pipewire_cmd(cfg: Config, node_id: int, fd: int, size: str,
     `crop` is (x, y, w, h) for "area" capture: the portal always hands over a
     whole monitor or window, so the region is trimmed here instead.
     """
-    width, height = (int(p) for p in size.split("x"))
+    stream_w, stream_h = (int(p) for p in size.split("x"))
+    if crop:
+        width, height = _packed_width(crop[2]), _even(crop[3])
+    else:
+        width, height = _packed_width(stream_w), _even(stream_h)
     pipeline = [
         "pipewiresrc", f"fd={fd}", f"path={node_id}", "do-timestamp=true",
         "!", "videorate",
@@ -169,9 +216,8 @@ def build_pipewire_cmd(cfg: Config, node_id: int, fd: int, size: str,
     if crop:
         cx, cy, cw, ch = crop
         pipeline += ["!", "videocrop", f"left={cx}", f"top={cy}",
-                     f"right={max(0, width - cx - cw)}",
-                     f"bottom={max(0, height - cy - ch)}"]
-        width, height = _even(cw), _even(ch)
+                     f"right={max(0, stream_w - cx - cw)}",
+                     f"bottom={max(0, stream_h - cy - ch)}"]
     pipeline += [
         "!", "videoconvert", "!", "videoscale",
         "!", f"video/x-raw,format=I420,width={width},height={height}",
@@ -180,15 +226,44 @@ def build_pipewire_cmd(cfg: Config, node_id: int, fd: int, size: str,
     return ["gst-launch-1.0", "-q"] + pipeline
 
 
+def pipewire_region(cfg: Config,
+                    session_size: tuple[int, int]) -> tuple[int, int, int, int] | None:
+    """The crop rectangle for "area" capture, clamped to the portal stream."""
+    if cfg.capture_mode != "area":
+        return None
+    geo = parse_region(cfg.capture_region)
+    if not geo:
+        return None
+    clamped = clamp_region(geo, session_size)
+    if clamped is None:
+        LOG.warning("capture_region %s is outside the stream; capturing all of it",
+                    cfg.capture_region)
+    elif clamped != geo:
+        LOG.info("capture_region trimmed to the stream: %s", clamped)
+    return clamped
+
+
+def pipewire_output_size(cfg: Config,
+                         session_size: tuple[int, int]) -> tuple[int, int]:
+    """Exact (width, height) the pump emits and ffmpeg is told to expect.
+
+    Both sides must agree to the pixel, so this is the single place the frame
+    size is decided.
+    """
+    geo = pipewire_region(cfg, session_size)
+    if geo:
+        w, h = geo[2], geo[3]
+    else:
+        if cfg.capture_mode == "area":
+            LOG.warning("No valid capture_region; using the full portal stream")
+        w, h = session_size
+    return _packed_width(w), _even(h)
+
+
 def pipewire_capture_size(cfg: Config, session_size: tuple[int, int]) -> str:
     """The 'WxH' ffmpeg will receive: the stream size, or the cropped region."""
-    if cfg.capture_mode == "area":
-        geo = parse_region(cfg.capture_region)
-        if geo:
-            return f"{_even(geo[2])}x{_even(geo[3])}"
-        LOG.warning("No valid capture_region; using the full portal stream")
-    w, h = session_size
-    return f"{_even(w)}x{_even(h)}"
+    w, h = pipewire_output_size(cfg, session_size)
+    return f"{w}x{h}"
 
 
 def audio_roles(cfg: Config) -> list[str]:
@@ -542,9 +617,7 @@ class Recorder:
         self._fifo = fifo
         dev.video_fifo = str(fifo)
 
-        crop = None
-        if self.cfg.capture_mode == "area":
-            crop = parse_region(self.cfg.capture_region)
+        crop = pipewire_region(self.cfg, self._session.size)
         cmd = build_pipewire_cmd(self.cfg, self._session.node_id, fd,
                                  f"{self._session.size[0]}x{self._session.size[1]}",
                                  fifo, crop)

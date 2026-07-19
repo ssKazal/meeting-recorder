@@ -10,8 +10,10 @@ from meeting_recorder.recorder import (
     build_ffmpeg_cmd,
     build_finalize_cmd,
     build_pipewire_cmd,
+    clamp_region,
     parse_region,
     pipewire_capture_size,
+    pipewire_region,
     video_geometry,
 )
 
@@ -155,11 +157,61 @@ def test_pipewire_capture_size_uses_region_then_stream():
     assert pipewire_capture_size(_cfg(capture_mode="fullscreen"), (1920, 1080)) == "1920x1080"
     assert pipewire_capture_size(
         _cfg(capture_mode="area", capture_region="0,0,800,600"), (1920, 1080)) == "800x600"
-    # Odd sizes get rounded down: x264/yuv420p needs even dimensions.
-    assert pipewire_capture_size(_cfg(capture_mode="fullscreen"), (1367, 769)) == "1366x768"
+    # Rounded down to a stride-safe width (multiple of 8) and an even height:
+    # x264/yuv420p needs even dimensions, and anything not a multiple of 8
+    # makes GStreamer pad its rows, which shears the picture. See
+    # test_pipewire_size_is_always_stride_safe.
+    assert pipewire_capture_size(_cfg(capture_mode="fullscreen"), (1367, 769)) == "1360x768"
     # A bad region falls back to the whole stream rather than failing.
     assert pipewire_capture_size(
         _cfg(capture_mode="area", capture_region="bogus"), (1920, 1080)) == "1920x1080"
+
+
+def test_pipewire_size_is_always_stride_safe():
+    """The pump's width must be a multiple of 8, or the picture shears.
+
+    Regression: GStreamer pads I420 rows to a 4-byte stride while ffmpeg's
+    rawvideo demuxer assumes tightly packed rows. Luma needs width % 4 == 0 and
+    chroma (width / 2) % 4 == 0, so only multiples of 8 satisfy both. Widths
+    like 645 made GStreamer write more bytes per row than ffmpeg read, offsetting
+    every row and smearing the video diagonally. 1920 and 640 happen to be safe,
+    which is why full screen looked fine and a dragged region did not.
+    """
+    import re
+    for region, stream in [("0,0,645,361", (1920, 1080)),
+                           ("10,10,700,500", (1920, 1080)),
+                           ("0,0,802,603", (1920, 1080)),
+                           (None, (1366, 768)),      # full screen, odd width
+                           (None, (1920, 1080))]:
+        cfg = _cfg(record_screen=True,
+                   capture_mode="area" if region else "fullscreen",
+                   capture_region=region or "")
+        size = pipewire_capture_size(cfg, stream)
+        width = int(size.split("x")[0])
+        assert width % 8 == 0, f"{region or stream}: width {width} would shear"
+
+        # ffmpeg is told the frame size separately from the caps the pump
+        # produces; if those ever disagree the same shearing returns.
+        crop = pipewire_region(cfg, stream)
+        cmd = " ".join(build_pipewire_cmd(cfg, 1, 2, f"{stream[0]}x{stream[1]}",
+                                          "/tmp/f", crop))
+        caps = re.search(r"width=(\d+),height=(\d+)", cmd)
+        assert f"{caps.group(1)}x{caps.group(2)}" == size, (
+            f"{region or stream}: pump emits {caps.group(0)} but ffmpeg expects {size}")
+
+
+def test_region_outside_the_screen_is_clamped():
+    """A region running off the edge must be trimmed, not silently rescaled.
+
+    Unclamped, x11grab was asked to grab past the screen and videocrop yielded
+    a smaller rectangle than the caps demanded, so videoscale upscaled it into
+    a blurry stretch of the wrong area.
+    """
+    assert clamp_region((1600, 900, 800, 400), (1920, 1080)) == (1600, 900, 320, 180)
+    assert clamp_region((-50, -20, 400, 300), (1920, 1080)) == (0, 0, 400, 300)
+    assert clamp_region((100, 100, 200, 200), (1920, 1080)) == (100, 100, 200, 200)
+    # Entirely off-screen: nothing to record, so the caller falls back.
+    assert clamp_region((3000, 2000, 100, 100), (1920, 1080)) is None
 
 
 def test_audio_roles_order():
