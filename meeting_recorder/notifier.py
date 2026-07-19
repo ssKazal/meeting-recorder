@@ -88,6 +88,15 @@ class Notifier:
             self._live.discard(note)
             self._fallback(summary, body)
 
+    @property
+    def has_live_notifications(self) -> bool:
+        """True while a notification we own is still on screen.
+
+        Its buttons are callbacks into *this* process, so a short-lived
+        command has to outlive the notification or clicking does nothing.
+        """
+        return bool(self._live)
+
     @staticmethod
     def _invoke(cb: Callable[[], None]) -> None:
         try:

@@ -1,8 +1,10 @@
 """System-tray recording control (AppIndicator3).
 
-Shows an icon in the GNOME top bar while recording; clicking it opens a menu with
-Pause/Resume, Stop & Save, Open folder and Settings. Requires the
-`ubuntu-appindicators` shell extension (enabled by default on Ubuntu GNOME).
+Shows an icon in the GNOME top bar while recording; clicking it opens a menu
+with the live timer, Pause/Resume and Stop & Save. Deliberately nothing else —
+the menu is for controlling the recording in front of you, not a launcher.
+Requires the `ubuntu-appindicators` shell extension (enabled by default on
+Ubuntu GNOME).
 
 Preferred over the floating pill widget; the caller falls back to
 recording_widget.RecordingWidget if this can't be created.
@@ -10,10 +12,6 @@ recording_widget.RecordingWidget if this can't be created.
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import sys
-from pathlib import Path
 from typing import Callable
 
 import gi
@@ -59,12 +57,10 @@ class RecordingTray:
 
     def __init__(self, on_pause: Callable[[], None],
                  on_resume: Callable[[], None],
-                 on_stop: Callable[[], None],
-                 output_dir: Path | None = None) -> None:
+                 on_stop: Callable[[], None]) -> None:
         self.on_pause = on_pause
         self.on_resume = on_resume
         self.on_stop = on_stop
-        self.output_dir = output_dir
         self.paused = False
 
         self.ind = AppIndicator3.Indicator.new(
@@ -87,16 +83,6 @@ class RecordingTray:
         self.stop_item = Gtk.MenuItem(label="Stop & Save")
         self.stop_item.connect("activate", lambda _i: self.on_stop())
         self._add(self.stop_item)
-
-        self._add(Gtk.SeparatorMenuItem())
-
-        self.folder_item = Gtk.MenuItem(label="Open recordings folder")
-        self.folder_item.connect("activate", self._on_open_folder)
-        self._add(self.folder_item)
-
-        self.settings_item = Gtk.MenuItem(label="Settings…")
-        self.settings_item.connect("activate", self._on_open_settings)
-        self._add(self.settings_item)
 
         self.menu.show_all()
         self.ind.set_menu(self.menu)
@@ -136,23 +122,3 @@ class RecordingTray:
             _icon_name(_ICON_PAUSED if self.paused else _ICON_RECORDING),
             "Paused" if self.paused else "Recording")
 
-    def _on_open_folder(self, _item: Gtk.MenuItem) -> None:
-        target = str(self.output_dir or Path.home())
-        try:
-            subprocess.Popen(["xdg-open", target],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except (OSError, subprocess.SubprocessError) as exc:
-            LOG.warning("Could not open %s: %s", target, exc)
-
-    def _on_open_settings(self, _item: Gtk.MenuItem) -> None:
-        # Spawn a separate process: the daemon runs a GLib loop and must not
-        # start a nested Gtk.main(). Prefer the installed console script, and
-        # fall back to the module (source checkouts).
-        exe = shutil.which("meeting-recorder")
-        cmd = [exe, "settings"] if exe else [sys.executable, "-m",
-                                             "meeting_recorder", "settings"]
-        try:
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
-        except (OSError, subprocess.SubprocessError) as exc:
-            LOG.warning("Could not open settings: %s", exc)

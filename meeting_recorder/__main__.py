@@ -27,6 +27,10 @@ from .config import load_config, write_default_user_config
 from .utils import LOG, build_output_path, setup_logging
 
 _SERVICE = "meeting-recorder.service"
+# How long `record` stays alive after saving, so the notification's Open Folder
+# button still has a process to call back into. Bounded: the file is already
+# safely written by this point, this is only about the button.
+_NOTIFICATION_LINGER_SECONDS = 180
 
 
 def _cmd_run(cfg) -> int:
@@ -93,12 +97,37 @@ def _cmd_record(cfg) -> int:
 
     def _on_finished(path):
         result["path"] = path
+        print(f"Saved: {path}" if path else "No file was saved.")
+        # Do not quit yet. The "saved" notification's Open Folder button is a
+        # callback into this process, so exiting now would leave a button that
+        # silently does nothing. Wait for the user to act on (or dismiss) the
+        # notification, with a cap so the command cannot hang forever.
+        if path is None or not notifier.has_live_notifications:
+            loop.quit()
+            return
+        result["waiting"] = True
+        GLib.timeout_add_seconds(1, _poll_notification)
+        GLib.timeout_add_seconds(_NOTIFICATION_LINGER_SECONDS, _give_up)
+
+    def _poll_notification():
+        if notifier.has_live_notifications:
+            return True                      # keep waiting
         loop.quit()
+        return False
+
+    def _give_up():
+        loop.quit()
+        return False
 
     # Fires however the recording ends: Ctrl-C, or Stop on the tray/pill.
     controller.on_finished = _on_finished
 
     def _stop(*_a):
+        # A second Ctrl-C, or one during the post-save wait for the
+        # notification, means "just leave" — there is nothing left to finalize.
+        if result.get("waiting") or result.get("path"):
+            loop.quit()
+            return False
         # stop_manual() only *launches* finalize (concat + denoise + loudnorm);
         # the loop keeps running until on_finished reports the saved file,
         # otherwise exiting here would kill the finalize child and leave
@@ -117,9 +146,7 @@ def _cmd_record(cfg) -> int:
     print("Recording — press Ctrl-C here, or use the tray icon, to stop.")
     loop.run()
 
-    saved = result.get("path")
-    print(f"Saved: {saved}" if saved else "No file was saved.")
-    return 0 if saved else 1
+    return 0 if result.get("path") else 1
 
 
 # -- service control (wraps `systemctl --user` so callers don't have to) ----
