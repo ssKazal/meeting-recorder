@@ -4,6 +4,26 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] — 2026-07-19
+
+### Fixed
+- **The tray icon was white instead of red.** 0.2.1 made it visible by switching
+  to `media-record-symbolic`, but gnome-shell recolours every `*-symbolic` icon
+  to the panel foreground, so the indicator no longer read as "recording". It
+  now ships two non-symbolic panel icons — a red dot while recording, amber
+  pause bars while paused — keeping the symbolic names as a fallback for source
+  checkouts. (The app icon can't be reused here: its thin dark screen outline
+  disappears against a dark panel at 22px.)
+- The release workflow hardcoded `Smart Meeting Recorder <tag>` as the release
+  title and runs after the tag push, so it renamed releases after the fact. The
+  title is now the bare tag.
+
+### Changed
+- Release notes no longer repeat the requirements block. It duplicated the
+  README on every release and drifted out of date — it still claimed Wayland was
+  unsupported on the release that added Wayland support. Requirements now live
+  only in the README.
+
 ## [0.2.1] — 2026-07-19
 
 ### Fixed
@@ -144,6 +164,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.2.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.2.0
 [0.1.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.1.2

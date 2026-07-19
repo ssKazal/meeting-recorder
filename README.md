@@ -5,7 +5,7 @@ system audio. Stops automatically when the call ends.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platform: Linux](https://img.shields.io/badge/platform-Linux%20%7C%20X11%20%7C%20Wayland-blue)
-![Version](https://img.shields.io/badge/version-0.2.1-green)
+![Version](https://img.shields.io/badge/version-0.2.2-green)
 
 No more remembering to hit record. The app sits in the background, notices when a call starts, and
 asks:
@@ -63,7 +63,7 @@ Updates then arrive with `apt upgrade` like any other package.
 Grab it from [Releases](../../releases) — `apt` pulls in ffmpeg and the rest automatically:
 
 ```bash
-sudo apt install ./meeting-recorder_0.2.1_all.deb
+sudo apt install ./meeting-recorder_0.2.2_all.deb
 ```
 
 The background service is enabled for you and starts at your next login. To start it right away:

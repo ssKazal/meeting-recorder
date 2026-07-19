@@ -1,3 +1,13 @@
+meeting-recorder (0.2.2) noble; urgency=medium
+
+  * Fix the tray icon rendering white: gnome-shell recolours *-symbolic icons to
+    the panel foreground, so ship non-symbolic panel icons (red dot while
+    recording, amber pause bars while paused).
+  * Stop the release workflow renaming releases; the title is now the bare tag.
+  * Drop the duplicated requirements block from the release notes footer.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Sun, 19 Jul 2026 15:20:00 +0600
+
 meeting-recorder (0.2.1) noble; urgency=medium
 
   * Fix the tray icon never appearing in the GNOME panel: it asked for
