@@ -271,10 +271,10 @@ class Controller:
                       on_stop=self._on_widget_stop)
         try:
             from .tray_indicator import RecordingTray
-            return RecordingTray(output_dir=self.cfg.output_dir, **kwargs)
+            return RecordingTray(**kwargs)
         except Exception:
-            LOG.debug("tray indicator unavailable; trying floating widget",
-                      exc_info=True)
+            LOG.warning("Tray icon unavailable, falling back to the floating "
+                        "pill", exc_info=True)
         try:
             from .recording_widget import RecordingWidget
             return RecordingWidget(**kwargs)
