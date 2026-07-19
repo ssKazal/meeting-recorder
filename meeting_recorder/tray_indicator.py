@@ -32,8 +32,14 @@ _ID = "meeting-recorder"
 # `media-record` name resolved for GTK (via the legacy Humanity theme) while
 # the shell found nothing and drew an invisible icon. `meeting-recorder` lives
 # in hicolor, which every theme inherits.
-_ICON_RECORDING = ("media-record-symbolic", "meeting-recorder")
-_ICON_PAUSED = ("media-playback-pause-symbolic", "meeting-recorder")
+# Our own coloured icons first: gnome-shell recolours any *-symbolic icon to the
+# panel foreground, so those come out plain white and a recording indicator
+# stops reading as "live". The symbolic names remain as a fallback for a source
+# checkout, where our icons are not installed into a theme directory yet.
+_ICON_RECORDING = ("meeting-recorder-recording", "media-record-symbolic",
+                   "meeting-recorder")
+_ICON_PAUSED = ("meeting-recorder-paused", "media-playback-pause-symbolic",
+                "meeting-recorder")
 
 
 def _icon_name(candidates: tuple[str, ...]) -> str:

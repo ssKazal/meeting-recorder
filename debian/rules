@@ -27,6 +27,10 @@ override_dh_auto_install:
 	    $(PKGDIR)/usr/share/applications/meeting-recorder.desktop
 	install -D -m 644 packaging/meeting-recorder.svg \
 	    $(PKGDIR)/usr/share/icons/hicolor/scalable/apps/meeting-recorder.svg
+	install -D -m 644 packaging/meeting-recorder-recording.svg \
+	    $(PKGDIR)/usr/share/icons/hicolor/scalable/apps/meeting-recorder-recording.svg
+	install -D -m 644 packaging/meeting-recorder-paused.svg \
+	    $(PKGDIR)/usr/share/icons/hicolor/scalable/apps/meeting-recorder-paused.svg
 
 override_dh_installman:
 	dh_installman packaging/meeting-recorder.1

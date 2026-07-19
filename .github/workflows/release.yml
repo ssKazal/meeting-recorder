@@ -67,6 +67,10 @@ jobs:
         with:
           files: dist/*.deb
           body_path: notes.md
-          name: Smart Meeting Recorder ${{ github.ref_name }}
+          # Title is the bare tag (v1.2.3) and nothing else, so the releases
+          # list reads as a clean version sequence. This step runs after the
+          # tag push and overwrites whatever title the release already had, so
+          # it is the only place the title can be set.
+          name: ${{ github.ref_name }}
           draft: false
           prerelease: false

@@ -47,6 +47,10 @@ install -m 644 "$ROOT/packaging/meeting-recorder.desktop" \
                "$BUILD/usr/share/applications/meeting-recorder.desktop"
 install -m 644 "$ROOT/packaging/meeting-recorder.svg" \
                "$BUILD/usr/share/icons/hicolor/scalable/apps/meeting-recorder.svg"
+install -m 644 "$ROOT/packaging/meeting-recorder-recording.svg" \
+               "$BUILD/usr/share/icons/hicolor/scalable/apps/meeting-recorder-recording.svg"
+install -m 644 "$ROOT/packaging/meeting-recorder-paused.svg" \
+               "$BUILD/usr/share/icons/hicolor/scalable/apps/meeting-recorder-paused.svg"
 gzip -9nc "$ROOT/packaging/meeting-recorder.1" \
     > "$BUILD/usr/share/man/man1/meeting-recorder.1.gz"
 chmod 644 "$BUILD/usr/share/man/man1/meeting-recorder.1.gz"

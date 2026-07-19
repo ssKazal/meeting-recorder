@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- Panel indicator for an active recording. Deliberately NOT named
+       *-symbolic: gnome-shell recolours symbolic icons to the panel foreground
+       (white), and a recording indicator needs to stay red to read as "live".
+       A filled dot survives being scaled down to 16px far better than the
+       screen-outline app icon, whose thin dark stroke vanishes on a dark panel. -->
+  <circle cx="8" cy="8" r="5.5" fill="#e01b24"/>
+</svg>
