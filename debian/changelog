@@ -1,3 +1,15 @@
+meeting-recorder (0.3.3) noble; urgency=medium
+
+  * Fix selected-area recordings shearing into diagonal colour smears: the
+    frame width is now rounded so GStreamer does not pad its rows behind
+    ffmpeg's back. Full-screen capture on a 1366-wide screen was affected too.
+  * Clamp a capture region that runs past the screen edge.
+  * Fix "Open Folder" doing nothing when the folder was already open; use the
+    FileManager1 interface so the new recording is selected in place.
+  * Recommend X11 over Wayland while supporting both.
+
+ -- Md Salman Siddik <salmansiddik19@gmail.com>  Sun, 19 Jul 2026 16:40:00 +0600
+
 meeting-recorder (0.3.2) noble; urgency=medium
 
   * Add an option to show or hide the mouse cursor in the recording.

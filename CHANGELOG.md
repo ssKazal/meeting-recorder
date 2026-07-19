@@ -4,6 +4,45 @@ All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions use
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.3] — 2026-07-19
+
+### Fixed
+- **Selected-area recordings came out as diagonal colour smears.** GStreamer
+  pads I420 rows to a 4-byte stride while ffmpeg's rawvideo demuxer assumes
+  rows are tightly packed, so any width that is not a multiple of 8 offset
+  every row and sheared the picture. At width 645 GStreamer wrote 349920 bytes
+  where ffmpeg read 348300. The frame size is now decided in one place and
+  rounded to a stride-safe width. This was not limited to region capture — a
+  1366-wide screen would have corrupted full-screen recordings the same way,
+  and 1920 only ever worked by luck.
+- A capture region running past the screen edge is now clamped. Unclamped it
+  asked x11grab to grab out of bounds, and on Wayland videocrop returned a
+  smaller rectangle than the caps demanded, so videoscale upscaled it into a
+  blurry stretch of the wrong area.
+- **"Open Folder" did nothing when the recordings folder was already open.**
+  `nautilus --select` neither re-selects the file nor raises the window in that
+  case, and a Wayland client cannot raise itself without an activation token.
+  It now uses the freedesktop `FileManager1` interface, so the new recording is
+  selected in the existing window.
+- Restored the "Open Folder" button on the "saved" notification. Removing it in
+  0.3.2 went too far: it is a button, so the file manager only ever appeared on
+  a click.
+- **The region selector painted the screen solid black** instead of dimming it,
+  so there was nothing to aim at. Two cairo mistakes: the dim layer was
+  composited with OVER onto an opaque backing (it needs SOURCE, which replaces
+  the alpha too), and the "punch the selection out" step passed operator 1 —
+  SOURCE — where it meant CLEAR, which is 0.
+- Region selection now uses the desktop's own picker
+  (`org.gnome.Shell.Screenshot.SelectArea`) where available, so it matches the
+  system theme instead of imitating it. Our overlay remains the fallback and
+  now draws its marquee in the theme's selection colour.
+
+### Changed
+- **X11 is now the recommended session.** Both are supported and tested, but
+  Wayland capture depends on `xdg-desktop-portal`: it needs a permission grant
+  and, on GNOME 46, can crash mid-session, after which recording continues with
+  audio only until it restarts. X11 talks to the display directly.
+
 ## [0.3.2] — 2026-07-19
 
 ### Added
@@ -242,6 +281,7 @@ First release.
   apply to new recordings only.
 - Drag-selecting a capture region needs the optional `slop` package.
 
+[0.3.3]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.3
 [0.3.2]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.2
 [0.3.1]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.1
 [0.3.0]: https://github.com/ssKazal/meeting-recorder/releases/tag/v0.3.0
