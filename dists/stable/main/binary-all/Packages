@@ -1,5 +1,5 @@
 Package: meeting-recorder
-Version: 0.1.2
+Version: 0.2.0
 Architecture: all
 Maintainer: Md Salman Siddik Kazal  salmansiddik19@outlook.com
 Depends: python3 (>= 3.10),
@@ -9,15 +9,20 @@ Depends: python3 (>= 3.10),
          gir1.2-appindicator3-0.1,
          ffmpeg,
          pulseaudio-utils,
-         x11-utils,
-         x11-xserver-utils
-Recommends: gnome-shell-extension-appindicator
+         xdg-desktop-portal,
+         gstreamer1.0-pipewire,
+         gstreamer1.0-plugins-base,
+         gstreamer1.0-plugins-good,
+         gstreamer1.0-tools
+Recommends: gnome-shell-extension-appindicator,
+            x11-utils,
+            x11-xserver-utils
 Suggests: slop
-Filename: pool/main/m/meeting-recorder/meeting-recorder_0.1.2_all.deb
-Size: 31726
-MD5sum: cd8609749e7165593d054273c540d601
-SHA1: 50601750f5d4ef00c901a354b911dceb9f3abd58
-SHA256: 4c15974384fd6b70ba292e29c2c2e8c39baeb3c51de5c355cbd64ec000848999
+Filename: pool/main/m/meeting-recorder/meeting-recorder_0.2.0_all.deb
+Size: 40922
+MD5sum: e23df94733a27eaabb8ec9d7adb728ea
+SHA1: dc72951a45faff6a2e277516a3c3557f6e46b0cf
+SHA256: 9b86c2ea76787cde199cc0dedd16faad9791e88b5c8045a13ce0b46dea797d60
 Section: video
 Priority: optional
 Homepage: https://github.com/ssKazal/meeting-recorder
@@ -37,6 +42,7 @@ Description: Automatic meeting recorder for Linux desktops
  loudness-normalised so both voices come out at a comparable level, and
  background noise is filtered from the mic.
  .
- Note: this release captures the screen via X11 (x11grab) and does not yet
- support Wayland sessions.
+ Both X11 and Wayland sessions are supported. On Wayland the screen is captured
+ through the xdg-desktop-portal ScreenCast interface, so the desktop asks you to
+ approve screen sharing the first time; the choice is remembered afterwards.
 

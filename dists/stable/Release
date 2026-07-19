@@ -1,24 +1,24 @@
 Architectures: all
 Codename: stable
 Components: main
-Date: Fri, 17 Jul 2026 15:49:32 +0000
+Date: Sun, 19 Jul 2026 08:46:39 +0000
 Description: Smart Meeting Recorder APT repository
 Label: Smart Meeting Recorder
 Origin: meeting-recorder
 Suite: stable
 MD5Sum:
- 7edd3cd4d5a1e8e54dbc3e5992ce406d              211 Release
- 64b743eac0f45de9991483bb57426d21             1696 main/binary-all/Packages
- 443a94e838753f1dfa8f2427a7f83328              990 main/binary-all/Packages.gz
+ 2f32d436f6e89ae92c4aaec75aa1858c              211 Release
+ ba4bc300e36b2effb5ac4338aa0f64f6             2000 main/binary-all/Packages
+ 9464de4702e6559a20b1159e1e3c5ab2             1097 main/binary-all/Packages.gz
 SHA1:
- db62d26096b2b96dc7d4a6dd2c05a25273679d94              211 Release
- 3fbcb93dd0dc123ac42b42381b9089016039af93             1696 main/binary-all/Packages
- c92702dbab53a0c5f35b85ad957515feb6b53baa              990 main/binary-all/Packages.gz
+ e3655e0e2cc270d93125bbe6253b119c275a910a              211 Release
+ b8649696002d52f3cd417f981db8b3dc8b6f5555             2000 main/binary-all/Packages
+ c10149f517e74b97e7ab8a586044fff351aa1ee0             1097 main/binary-all/Packages.gz
 SHA256:
- e76fdd1aea7821a95fca123c91e1d98d2ab1fef341333d62669a9aca83566136              211 Release
- 281b1d074f81431d8766e0938e738868bdf9520f9f4ffab09c85a130e0bd490e             1696 main/binary-all/Packages
- bb9864bd296a2025d1a427fccc3978f2f5ecab8c67cc2bd77c95898f988e46d3              990 main/binary-all/Packages.gz
+ 6098e79139bce9b5c953b56bea2584fa02a08a0b051b6d517365462f2252ea1c              211 Release
+ c0704be8f0097dd63c5fb8dd55c9a25274712f01a376f952cdc875f52cb355f7             2000 main/binary-all/Packages
+ c5e0998f1de79674f8b13d45ce1a1ae3ee4bb67f0c428a013392ba759cf14670             1097 main/binary-all/Packages.gz
 SHA512:
- 817a0c053174b37cfba805f4ce4715618db27c469438e12aee0873dd406c79a12261dd6fd6f985a1309accc46ce990357b01ec2916bfe2771b479d79112ce428              211 Release
- 287fd881c1642c411f84e9ff9d6b7c5fe51af9fbdde0e1dee742025b646443d3a7d000e1faf9abba6eb937596c93fd1062eb9d3e8a2cd101cf5346b7c0ee1381             1696 main/binary-all/Packages
- d8d4cb12ccae7d2305e387fd4e83544aa79f48f18e79cdc523e7aeec237fbe0d2e4ef998559d660d48e323de410f14adfce51823654abe5f46315d767f9e5b05              990 main/binary-all/Packages.gz
+ 2b278a1153e402f69f7784d5d34e65406e231f94194947c8997e6469f325494432a2b0b2101fcaa375a5c964841b8b74d6bb73a1b6d249bb5f1555d38ed22230              211 Release
+ 46dac58a1424d9a234b5570853b4bfb4658077709518b69aeaafecc8e116a6f8d65836d02107a5ff811451b0847b4c82653079fbbacd39d976e8a8fa1a744321             2000 main/binary-all/Packages
+ d2ab1f50bc6da15a3f3b96023df209fb060bba694dc81942b2fb1665ae51f2637d479eb8b0b06c1699b86b7412212d0c90ed007eb05dfe486e033103ccc3ae97             1097 main/binary-all/Packages.gz
