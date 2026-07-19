@@ -1,5 +1,5 @@
 Package: meeting-recorder
-Version: 0.3.2
+Version: 0.3.3
 Architecture: all
 Maintainer: Md Salman Siddik Kazal  salmansiddik19@outlook.com
 Depends: python3 (>= 3.10),
@@ -17,11 +17,11 @@ Depends: python3 (>= 3.10),
 Recommends: gnome-shell-extension-appindicator,
             x11-utils,
             x11-xserver-utils
-Filename: pool/main/m/meeting-recorder/meeting-recorder_0.3.2_all.deb
-Size: 47460
-MD5sum: 0a5086d896c67e8eecaa559e36da952d
-SHA1: 1893c9876d7491cec2d9a3fcf8c4e4006ded24f5
-SHA256: c1a2e76062653d9ccdbbb1d89182c30d2059c16795d38fdffeb1dacd872e3df8
+Filename: pool/main/m/meeting-recorder/meeting-recorder_0.3.3_all.deb
+Size: 50778
+MD5sum: a65fdb70e741f825abce62d805efbda5
+SHA1: 5cc75dbb496b60cf5afb639bd23361fb2916bd2d
+SHA256: efcb8f11aaaa8fcf4b198008ba506d5289367a0864dfbe6b493c2b060454f8cd
 Section: video
 Priority: optional
 Homepage: https://github.com/ssKazal/meeting-recorder
@@ -41,7 +41,10 @@ Description: Automatic meeting recorder for Linux desktops
  loudness-normalised so both voices come out at a comparable level, and
  background noise is filtered from the mic.
  .
- Both X11 and Wayland sessions are supported. On Wayland the screen is captured
- through the xdg-desktop-portal ScreenCast interface, so the desktop asks you to
- approve screen sharing the first time; the choice is remembered afterwards.
+ Both X11 and Wayland sessions are supported, with X11 recommended. On Wayland
+ the screen is captured through the xdg-desktop-portal ScreenCast interface, so
+ the desktop asks you to approve screen sharing the first time; the choice is
+ remembered afterwards. That portal is an extra moving part - on GNOME 46 it can
+ crash mid-session, after which recording continues with audio only - so an X11
+ session is the more predictable choice for now.
 

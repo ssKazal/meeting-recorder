@@ -42,10 +42,13 @@ sudo apt install meeting-recorder</code></pre>
 meeting-recorder status     # service state + detected meeting
 meeting-recorder settings   # settings window</code></pre>
 
-<p class="warn"><strong>X11 and Wayland.</strong> The capture backend is chosen
-automatically: X11 uses <code>x11grab</code>, Wayland uses the
+<p class="warn"><strong>X11 and Wayland — X11 recommended.</strong> The capture
+backend is chosen automatically: X11 uses <code>x11grab</code>, Wayland uses the
 <code>xdg-desktop-portal</code> ScreenCast API. On Wayland the desktop asks
-permission to share the screen the first time; the choice is remembered.</p>
+permission to share the screen the first time; the choice is remembered. The
+portal is an extra moving part — on GNOME 46 it can crash mid-session, after
+which recording continues with audio only — so X11 is the steadier option
+today.</p>
 
 <h2>Uninstall</h2>
 <pre><code>sudo apt remove meeting-recorder
