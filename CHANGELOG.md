@@ -28,11 +28,11 @@ All notable changes to this project are documented here. Format follows
   once at startup, so saving without restarting left the new settings silently
   inert. Save now writes, restarts the service and closes the window — staying
   open only if the restart fails.
-- **`stop_debounce_seconds` now defaults to 60s** (was 5s). Apps release the
-  microphone while you are muted, which is indistinguishable from leaving the
-  call, so a short delay ended the recording the moment you muted yourself. The
-  extra wait is trimmed off the saved file, so the recording still ends where
-  the call did. The settings cap rose from 15s to 300s to match.
+- **`stop_debounce_seconds` now defaults to 3s** (was 5s) and the settings cap
+  rose from 15s to 300s. Because muting releases the microphone, this delay is
+  also the longest mute that will not end the recording — raise it if you mute
+  for long stretches. The wait is trimmed off the saved file, so a larger value
+  costs nothing but a recorder that keeps running after the call.
 
 ## [0.2.2] — 2026-07-19
 

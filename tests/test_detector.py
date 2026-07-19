@@ -98,9 +98,9 @@ def test_debounce_reports_stop_overshoot():
 def test_debounce_survives_a_mute_shorter_than_the_stop_delay():
     """Muting yourself releases the mic; that must not end the recording.
 
-    This is why stop_debounce defaults to 60s: an app dropping its capture
-    stream while muted is indistinguishable from leaving the call, so the only
-    way to tell them apart is to wait.
+    An app dropping its capture stream while muted is indistinguishable from
+    leaving the call, so stop_debounce is also the longest mute that survives.
+    Uses 60s here to show the mechanism; the shipped default is shorter.
     """
     m = DebounceMachine(start_debounce=3.0, stop_debounce=60.0)
     m.update("Chrome", 0.0)

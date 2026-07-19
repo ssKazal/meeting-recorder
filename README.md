@@ -167,7 +167,7 @@ The GUI covers everything, but the config file is
 | `noise_model_path` | Optional RNNoise `.rnnn` model for better denoising |
 | `auto_record` | Skip the popup and record automatically |
 | `prompt_timeout_seconds` | How long the popup waits for an answer |
-| `start_debounce_seconds` / `stop_debounce_seconds` | How long audio must be present/absent before starting/stopping. The stop delay defaults to 60s so muting yourself (which releases the mic) does not end the recording; the wait is trimmed off the saved file. |
+| `start_debounce_seconds` / `stop_debounce_seconds` | How long audio must be present/absent before starting/stopping. Because muting releases the microphone, the stop delay is also the longest mute that won't end the recording — raise it if you mute for long stretches. The wait is trimmed off the saved file. |
 | `poll_interval_seconds` | How often capture streams are checked |
 | `min_recording_seconds` | Discard recordings shorter than this |
 | `allowlist` | `{"match": "<substring>", "app": "<Display Name>"}` rules |

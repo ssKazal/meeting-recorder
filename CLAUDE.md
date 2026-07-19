@@ -29,10 +29,12 @@ never records without consent.
   mic stream as a *source-output* tagged with the owning app. We poll `pactl list source-outputs`
   and match `application.name`/`binary` against an editable allowlist. Monitor (system-audio)
   streams are ignored so only real mic use triggers.
-- **Debounce** avoids flapping: ~3s sustained presence to start, ~60s absence to stop.
-  The stop side is long on purpose: muting yourself makes the app release the mic
-  stream, which is indistinguishable from leaving the call. The wait is reported as
-  `stop_overshoot` and trimmed off the end, so the file still ends where the call did.
+- **Debounce** avoids flapping: ~3s sustained presence to start, ~3s absence to stop.
+  Muting yourself makes the app release the mic stream, which is indistinguishable
+  from leaving the call — so `stop_debounce_seconds` is also the longest mute that
+  will not end the recording. Raising it costs nothing in the file (the wait is
+  reported as `stop_overshoot` and trimmed off the end) but does leave the recorder
+  visibly running after the call.
 - **Popup** via libnotify (`gi.repository.Notify`) with Record/Ignore buttons.
 - **Recording is two-stage** (this is the core design — don't put audio filters back in the live path):
   1. *Live capture*: video + mic and system audio as **separate, unfiltered** tracks.
