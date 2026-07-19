@@ -11,9 +11,4 @@ sudo apt install ./meeting-recorder___VERSION___all.deb
 meeting-recorder start
 ```
 
-### ⚠️ Requirements
-
-- **X11 and Wayland.** The backend is chosen automatically: X11 captures with `x11grab`, Wayland through the `xdg-desktop-portal` ScreenCast API. On Wayland your desktop asks permission to share the screen the first time — the choice is remembered, so recording stays one click.
-- Debian/Ubuntu (built and tested on Ubuntu 24.04), GNOME, PipeWire or PulseAudio.
-
-**Full documentation:** [README](https://github.com/ssKazal/meeting-recorder#readme) · **Changelog:** [CHANGELOG.md](https://github.com/ssKazal/meeting-recorder/blob/main/CHANGELOG.md)
+Requirements and setup: [README](https://github.com/ssKazal/meeting-recorder#readme) · Full history: [CHANGELOG.md](https://github.com/ssKazal/meeting-recorder/blob/main/CHANGELOG.md)
