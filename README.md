@@ -27,7 +27,7 @@ recording stops on its own and the file is saved as `Zoom_2026-07-17_14-30-05.mk
 
 | | |
 |---|---|
-| **Session** | X11 or Wayland. X11 captures with `x11grab`; Wayland uses the xdg-desktop-portal ScreenCast API. |
+| **Session** | X11 or Wayland — **X11 recommended.** X11 captures directly with `x11grab`. Wayland has to go through `xdg-desktop-portal`, which asks permission the first time and, on GNOME 46, sometimes crashes mid-session; screen capture then falls back to audio-only until it restarts. Both are supported and tested; X11 is simply the calmer path today. |
 | OS | Debian/Ubuntu (built and tested on Ubuntu 24.04) |
 | Desktop | GNOME (tray icon needs the AppIndicator extension, shipped by default on Ubuntu) |
 | Audio | PipeWire or PulseAudio |
@@ -40,7 +40,13 @@ echo $XDG_SESSION_TYPE     # x11 or wayland
 
 On **Wayland** the compositor — not the app — owns the screen, so the first recording asks you to
 approve screen sharing through your desktop's own dialog. That choice is remembered, so later
-recordings stay one click. See [Known limitations](#known-limitations) for the Wayland caveats.
+recordings stay one click.
+
+**If you have the choice, pick X11.** Wayland works and is tested, but capture depends on
+`xdg-desktop-portal`: it needs a permission grant, and on GNOME 46 the portal can crash
+mid-session — recording then continues with audio only until it restarts. X11 talks to the display
+directly, with none of that in the way. Log in with "Ubuntu on Xorg" from the gear menu on the
+login screen. See [Known limitations](#known-limitations) for the rest of the Wayland caveats.
 
 ## Install
 
@@ -253,6 +259,9 @@ during live capture*).
 
 ## Known limitations
 
+- **X11 is the recommended session.** Wayland is supported and tested, but its capture path goes
+  through `xdg-desktop-portal`, which is an extra moving part: it asks permission, and on GNOME 46
+  it can crash mid-session, after which recording falls back to audio only until it restarts.
 - **Wayland asks permission once** — the portal dialog appears on the first recording; the answer is
   remembered in `wayland_restore_token`. Denying it records audio only.
 - **On Wayland the control pill is placed by the compositor** — Wayland clients cannot position their

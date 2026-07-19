@@ -36,6 +36,9 @@ Description: Automatic meeting recorder for Linux desktops
  loudness-normalised so both voices come out at a comparable level, and
  background noise is filtered from the mic.
  .
- Both X11 and Wayland sessions are supported. On Wayland the screen is captured
- through the xdg-desktop-portal ScreenCast interface, so the desktop asks you to
- approve screen sharing the first time; the choice is remembered afterwards.
+ Both X11 and Wayland sessions are supported, with X11 recommended. On Wayland
+ the screen is captured through the xdg-desktop-portal ScreenCast interface, so
+ the desktop asks you to approve screen sharing the first time; the choice is
+ remembered afterwards. That portal is an extra moving part - on GNOME 46 it can
+ crash mid-session, after which recording continues with audio only - so an X11
+ session is the more predictable choice for now.

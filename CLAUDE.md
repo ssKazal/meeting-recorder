@@ -67,7 +67,8 @@ never records without consent.
 - Everything runs on one **GLib main loop**; ships as a `systemctl --user` service.
 
 ## Environment assumptions
-Ubuntu 24.04, **X11 or Wayland**, GNOME, **PipeWire**. Runs on system `python3` using system
+Ubuntu 24.04, **X11 or Wayland** (X11 is the recommended/steadier path; the
+Wayland portal is an extra moving part and can crash mid-session), GNOME, **PipeWire**. Runs on system `python3` using system
 PyGObject — **no pip dependencies**. Requires apt: `ffmpeg`, `pulseaudio-utils`,
 `gir1.2-notify-0.7`; `xdg-desktop-portal` + `gstreamer1.0-pipewire` for Wayland capture,
 `x11-xserver-utils` + `x11-utils` for X11 capture.
