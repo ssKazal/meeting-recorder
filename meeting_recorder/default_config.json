@@ -18,7 +18,7 @@
   "container": "mkv",
   "prompt_timeout_seconds": 30,
   "start_debounce_seconds": 3.0,
-  "stop_debounce_seconds": 5.0,
+  "stop_debounce_seconds": 60.0,
   "poll_interval_seconds": 1.0,
   "min_recording_seconds": 3.0,
   "allowlist": [

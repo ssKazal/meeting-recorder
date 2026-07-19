@@ -93,3 +93,25 @@ def test_debounce_reports_stop_overshoot():
     assert m.update(None, 12.0) == ("stop", None)
     # We kept recording from 10.0 -> 12.0, so 2s must be trimmed.
     assert m.stop_overshoot == 2.0
+
+
+def test_debounce_survives_a_mute_shorter_than_the_stop_delay():
+    """Muting yourself releases the mic; that must not end the recording.
+
+    This is why stop_debounce defaults to 60s: an app dropping its capture
+    stream while muted is indistinguishable from leaving the call, so the only
+    way to tell them apart is to wait.
+    """
+    m = DebounceMachine(start_debounce=3.0, stop_debounce=60.0)
+    m.update("Chrome", 0.0)
+    m.update("Chrome", 3.0)                       # -> start
+    # Muted at t=10, unmuted at t=45: absent for 35s, well under the 60s delay.
+    assert m.update(None, 10.0) is None
+    assert m.update(None, 30.0) is None
+    assert m.update(None, 44.0) is None
+    assert m.update("Chrome", 45.0) is None       # still recording, no restart
+    # Really leaving the call does stop it, once the full delay elapses.
+    assert m.update(None, 100.0) is None
+    assert m.update(None, 159.0) is None
+    assert m.update(None, 161.0) == ("stop", None)
+    assert m.stop_overshoot == 61.0               # trimmed off the saved file

@@ -9,20 +9,16 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk  # noqa: E402
 
-from .config import load_raw_config, save_user_config, user_config_path
+from .config import load_defaults, load_raw_config, save_user_config
 from .utils import LOG, expand_path
 
-CONTAINERS = ["mkv", "mp4"]
-# (config value, display label)
-CAPTURE_MODES = [("fullscreen", "Full screen"),
-                 ("window", "Current window"),
-                 ("area", "Selected area")]
 
 
 class SettingsWindow(Gtk.Window):
@@ -49,101 +45,98 @@ class SettingsWindow(Gtk.Window):
         scroller.add(grid)
         self._row = 0
 
+        # Deliberately minimal. Everything else the daemon understands stays
+        # editable in ~/.config/meeting-recorder/config.json — hiding a knob
+        # here does not remove the feature, it just stops the window from
+        # presenting a decision most people should not have to make.
+        # Not shown, and why:
+        #   container      mkv survives an interrupted recording; mp4 does not
+        #   framerate      30 is right for a meeting; 60 only doubles the size
+        #   capture_mode   full screen is the meeting case, and on Wayland the
+        #   capture_region portal already asks which screen or window to share
+        #   mic/system     volume  loudnorm already equalises both sources, so
+        #                  these fight the normaliser
+        #   normalize_voice  equalising the two voices should just be on
+        #   prompt_timeout_seconds  30s needs no tuning
+
         # --- Storage ------------------------------------------------------
         self._section(grid, "Storage")
         self.output_chooser = Gtk.FileChooserButton(
             title="Recording folder", action=Gtk.FileChooserAction.SELECT_FOLDER)
-        self.output_chooser.set_filename(str(expand_path(self.data.get("output_dir", "~"))))
         self._field(grid, "Save folder", self.output_chooser)
 
-        self.format_combo = Gtk.ComboBoxText()
-        for c in CONTAINERS:
-            self.format_combo.append_text(c)
-        cur = self.data.get("container", "mkv")
-        self.format_combo.set_active(CONTAINERS.index(cur) if cur in CONTAINERS else 0)
-        self._field(grid, "File format", self.format_combo)
+        # --- What to record -------------------------------------------------
+        self._section(grid, "What to record")
+        self.screen_switch = self._switch(True)
+        self._field(grid, "Screen", self.screen_switch)
 
-        # --- Video --------------------------------------------------------
-        self._section(grid, "Video")
-        self.screen_switch = self._switch(self.data.get("record_screen", True))
-        self._field(grid, "Record screen", self.screen_switch)
+        self.mic_switch = self._switch(True)
+        self._field(grid, "Microphone", self.mic_switch)
 
-        self.capture_combo = Gtk.ComboBoxText()
-        for _val, label in CAPTURE_MODES:
-            self.capture_combo.append_text(label)
-        cur_mode = self.data.get("capture_mode", "fullscreen")
-        idx = next((i for i, (v, _l) in enumerate(CAPTURE_MODES) if v == cur_mode), 0)
-        self.capture_combo.set_active(idx)
-        self.capture_combo.connect("changed", self._on_capture_mode_changed)
-        self._field(grid, "Capture area", self.capture_combo)
+        self.sys_switch = self._switch(True)
+        self._field(grid, "System audio (the other people)", self.sys_switch)
 
-        # Region row (only for "Selected area"): an x,y,w,h entry + drag-select button.
-        region_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        self.region_entry = Gtk.Entry()
-        self.region_entry.set_placeholder_text("x,y,w,h")
-        self.region_entry.set_text(self.data.get("capture_region", ""))
-        self.region_entry.set_hexpand(True)
-        self.select_btn = Gtk.Button(label="Select…")
-        self.select_btn.connect("clicked", self._on_select_area)
-        region_box.pack_start(self.region_entry, True, True, 0)
-        region_box.pack_start(self.select_btn, False, False, 0)
-        self._field(grid, "Region", region_box)
-
-        self.fps_spin = Gtk.SpinButton.new_with_range(5, 60, 1)
-        self.fps_spin.set_value(int(self.data.get("framerate", 30)))
-        self._field(grid, "Frame rate (fps)", self.fps_spin)
-        self._on_capture_mode_changed(self.capture_combo)  # set initial sensitivity
-
-        # --- Audio --------------------------------------------------------
-        self._section(grid, "Audio")
-        self.mic_switch = self._switch(self.data.get("record_mic", True))
-        self._field(grid, "Record microphone", self.mic_switch)
-
-        self.sys_switch = self._switch(self.data.get("record_system_audio", True))
-        self._field(grid, "Record system audio", self.sys_switch)
-
-        self.mic_vol = self._volume_scale(self.data.get("mic_volume", 1.0))
-        self._field(grid, "Mic volume", self.mic_vol)
-
-        self.sys_vol = self._volume_scale(self.data.get("system_volume", 1.0))
-        self._field(grid, "System volume", self.sys_vol)
-
-        self.normalize_switch = self._switch(self.data.get("normalize_voice", True))
-        self._field(grid, "Equalize voices (normalize)", self.normalize_switch)
-
-        self.noise_switch = self._switch(self.data.get("noise_cancellation", True))
+        self.noise_switch = self._switch(True)
         self._field(grid, "Noise cancellation", self.noise_switch)
 
         # --- Behavior -----------------------------------------------------
         self._section(grid, "Behavior")
-        self.auto_switch = self._switch(self.data.get("auto_record", False))
-        self._field(grid, "Auto-record (skip popup)", self.auto_switch)
+        self.auto_switch = self._switch(False)
+        self._field(grid, "Auto-record (skip the popup)", self.auto_switch)
 
-        self.timeout_spin = Gtk.SpinButton.new_with_range(5, 120, 1)
-        self.timeout_spin.set_value(int(self.data.get("prompt_timeout_seconds", 30)))
-        self._field(grid, "Popup timeout (s)", self.timeout_spin)
-
-        self.stop_spin = Gtk.SpinButton.new_with_range(0.5, 15, 0.5)
+        # Apps release the mic while you are muted, which looks identical to
+        # leaving the call — this delay is what stops a mute from ending the
+        # recording. The wait is trimmed off the saved file, so a generous
+        # value costs nothing but disk.
+        self.stop_spin = Gtk.SpinButton.new_with_range(0.5, 300, 5)
         self.stop_spin.set_digits(1)
-        self.stop_spin.set_value(float(self.data.get("stop_debounce_seconds", 2.0)))
-        self._field(grid, "Stop delay after call (s)", self.stop_spin)
+        self._field(grid, "Keep recording after the call ends (s)", self.stop_spin)
+
+        self._load_into_widgets()
 
         # --- Buttons ------------------------------------------------------
         self.status = Gtk.Label(label="", xalign=0)
         outer.pack_start(self.status, False, False, 0)
 
+        left = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        left.set_halign(Gtk.Align.START)
+        self.record_btn = Gtk.Button(label="● Record now")
+        self.record_btn.set_tooltip_text(
+            "Start recording immediately, without waiting for a meeting to be "
+            "detected. Stop it from the tray icon.")
+        self.record_btn.connect("clicked", self._on_record_now)
+        left.pack_start(self.record_btn, False, False, 0)
+        # Reset sits apart from Save/Close so it is not clicked by accident.
+        reset = Gtk.Button(label="Reset to defaults")
+        reset.connect("clicked", self._on_reset)
+        left.pack_start(reset, False, False, 0)
+        outer.pack_start(left, False, False, 0)
+
         btns = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         btns.set_halign(Gtk.Align.END)
-        cancel = Gtk.Button(label="Close")
+        cancel = Gtk.Button(label="Cancel")
         cancel.connect("clicked", lambda _b: self.close())
+        # One button, not "Save" and "Save & Apply": saving without applying
+        # leaves the daemon running the old values with no sign that anything
+        # is stale, which is a trap rather than a choice worth offering.
         save = Gtk.Button(label="Save")
-        save.connect("clicked", lambda _b: self._save(restart=False))
-        save_restart = Gtk.Button(label="Save & Apply")
-        save_restart.get_style_context().add_class("suggested-action")
-        save_restart.connect("clicked", lambda _b: self._save(restart=True))
-        for b in (cancel, save, save_restart):
+        save.get_style_context().add_class("suggested-action")
+        save.connect("clicked", lambda _b: self._save())
+        for b in (cancel, save):
             btns.pack_start(b, False, False, 0)
         outer.pack_start(btns, False, False, 0)
+
+    # -- load ---------------------------------------------------------------
+    def _load_into_widgets(self) -> None:
+        """Push self.data into every field. Used at startup and by Reset."""
+        d = self.data
+        self.output_chooser.set_filename(str(expand_path(d.get("output_dir", "~"))))
+        self.screen_switch.set_active(bool(d.get("record_screen", True)))
+        self.mic_switch.set_active(bool(d.get("record_mic", True)))
+        self.sys_switch.set_active(bool(d.get("record_system_audio", True)))
+        self.noise_switch.set_active(bool(d.get("noise_cancellation", True)))
+        self.auto_switch.set_active(bool(d.get("auto_record", False)))
+        self.stop_spin.set_value(float(d.get("stop_debounce_seconds", 60.0)))
 
     # -- widget helpers ----------------------------------------------------
     def _section(self, grid: Gtk.Grid, title: str) -> None:
@@ -172,69 +165,89 @@ class SettingsWindow(Gtk.Window):
         sw.set_halign(Gtk.Align.END)
         return sw
 
-    @staticmethod
-    def _volume_scale(value: float) -> Gtk.Scale:
-        adj = Gtk.Adjustment(value=float(value), lower=0.0, upper=3.0,
-                             step_increment=0.1, page_increment=0.5)
-        scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=adj)
-        scale.set_digits(1)
-        scale.set_value_pos(Gtk.PositionType.RIGHT)
-        for mark in (0.0, 1.0, 2.0, 3.0):
-            scale.add_mark(mark, Gtk.PositionType.BOTTOM, None)
-        return scale
+    # -- record now ---------------------------------------------------------
+    def _on_record_now(self, _btn: Gtk.Button) -> None:
+        """Start a manual recording in its own process.
 
-    # -- capture-area handlers --------------------------------------------
-    def _current_capture_mode(self) -> str:
-        return CAPTURE_MODES[self.capture_combo.get_active()][0]
-
-    def _on_capture_mode_changed(self, _combo: Gtk.ComboBoxText) -> None:
-        is_area = self._current_capture_mode() == "area"
-        self.region_entry.set_sensitive(is_area)
-        self.select_btn.set_sensitive(is_area and shutil.which("slop") is not None)
-        if is_area and shutil.which("slop") is None:
-            self.select_btn.set_tooltip_text("Install 'slop' to drag-select a region")
-
-    def _on_select_area(self, _btn: Gtk.Button) -> None:
-        """Use `slop` to drag-select a screen region, then fill the entry."""
-        if not shutil.which("slop"):
-            self.status.set_text("Install 'slop' (sudo apt install slop) to drag-select.")
-            return
+        Spawns the `record` subcommand rather than recording in-process: that
+        path already owns the tray icon, timer, pause/resume and the Wayland
+        portal handshake, and this window must not start a second GLib loop.
+        Detached, so the recording outlives the settings window.
+        """
+        exe = shutil.which("meeting-recorder")
+        cmd = [exe, "record"] if exe else [sys.executable, "-m",
+                                           "meeting_recorder", "record"]
         try:
-            out = subprocess.run(["slop", "-f", "%x,%y,%w,%h"],
-                                 capture_output=True, text=True, timeout=60)
-            region = out.stdout.strip()
-            if region:
-                self.region_entry.set_text(region)
-        except (subprocess.SubprocessError, FileNotFoundError) as exc:
-            LOG.warning("slop failed: %s", exc)
+            subprocess.Popen(cmd, start_new_session=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError) as exc:
+            LOG.warning("Could not start a manual recording: %s", exc)
+            self.status.set_markup(
+                f"<span foreground='#c62828'>Could not start recording: {exc}</span>")
+            return
+        self.status.set_markup(
+            "<span foreground='#2e7d32'>Recording — stop it from the tray icon."
+            "</span>")
+
+    # -- reset -------------------------------------------------------------
+    def _on_reset(self, _btn: Gtk.Button) -> None:
+        """Put every field back to the shipped defaults, after confirming.
+
+        Nothing is written until Save: the user can still close the window to
+        back out. The allowlist and any keys this window does not expose are
+        reset too — that is the point of "defaults" — so it is worth a prompt.
+        """
+        dialog = Gtk.MessageDialog(
+            transient_for=self, modal=True,
+            message_type=Gtk.MessageType.WARNING,
+            buttons=Gtk.ButtonsType.OK_CANCEL,
+            text="Reset all settings to their defaults?")
+        dialog.format_secondary_text(
+            "This also restores the meeting app allowlist and clears the saved "
+            "screen-sharing permission. Nothing is written until you press Save.")
+        response = dialog.run()
+        dialog.destroy()
+        if response != Gtk.ResponseType.OK:
+            return
+
+        self.data = load_defaults()
+        self._load_into_widgets()
+        self.status.set_markup(
+            "<span foreground='#b26a00'>Defaults loaded — press Save to apply."
+            "</span>")
 
     # -- save --------------------------------------------------------------
-    def _save(self, restart: bool) -> None:
+    def _save(self) -> None:
+        """Write the config, restart the daemon so it takes effect, and close.
+
+        The restart is not optional: the daemon reads its config once at
+        startup, so a saved-but-not-restarted setting silently does nothing.
+        The window stays open only if the restart fails, so the user finds out.
+        """
         folder = self.output_chooser.get_filename()
+        # self.data came from load_raw_config(), so keys this window does not
+        # expose (allowlist, framerate, capture_mode, ...) are written back
+        # exactly as they were.
         self.data.update({
             "output_dir": folder or self.data.get("output_dir", "~/Videos/MeetingRecorder"),
-            "container": CONTAINERS[self.format_combo.get_active()],
             "record_screen": self.screen_switch.get_active(),
-            "capture_mode": self._current_capture_mode(),
-            "capture_region": self.region_entry.get_text().strip(),
-            "framerate": int(self.fps_spin.get_value()),
             "record_mic": self.mic_switch.get_active(),
             "record_system_audio": self.sys_switch.get_active(),
-            "mic_volume": round(self.mic_vol.get_value(), 2),
-            "system_volume": round(self.sys_vol.get_value(), 2),
-            "normalize_voice": self.normalize_switch.get_active(),
             "noise_cancellation": self.noise_switch.get_active(),
             "auto_record": self.auto_switch.get_active(),
-            "prompt_timeout_seconds": int(self.timeout_spin.get_value()),
             "stop_debounce_seconds": round(self.stop_spin.get_value(), 1),
         })
         path = save_user_config(self.data)
-        msg = f"Saved to {path}"
-        if restart:
-            ok = _restart_service()
-            msg += "  •  service restarted" if ok else "  •  saved (restart the app to apply)"
-        self.status.set_markup(f"<span foreground='#2e7d32'>{msg}</span>")
-        LOG.info(msg)
+        LOG.info("Saved settings to %s", path)
+        if _restart_service():
+            self.close()
+            return
+        # Saved, but the running daemon still has the old values — say so
+        # instead of closing on a half-applied change.
+        self.status.set_markup(
+            "<span foreground='#b26a00'>Saved, but the background service could "
+            "not be restarted — run <tt>meeting-recorder restart</tt> to apply."
+            "</span>")
 
 
 def _restart_service() -> bool:

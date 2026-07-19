@@ -93,6 +93,11 @@ def _load_defaults() -> dict[str, Any]:
         return json.load(fh)
 
 
+def load_defaults() -> dict[str, Any]:
+    """The shipped defaults, with no user overrides — used by Reset."""
+    return _load_defaults()
+
+
 def load_config() -> Config:
     """Load defaults, deep-merge the user's config.json on top, return a Config."""
     data = _load_defaults()
